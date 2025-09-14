@@ -8,6 +8,7 @@ error handling, and integration with the session management system.
 import logging
 import time
 from src.common.download_monitor import get_global_monitor
+from src.common.url_utils import sanitize_youtube_url, YouTubeURLError
 from typing import Optional, Dict, Any, Callable, Union
 from pathlib import Path
 from dataclasses import dataclass
@@ -254,8 +255,24 @@ class AudioDownloader:
         try:
             logger.info(f"Starting audio download: {url}")
             
+            # Sanitize URL first
+            try:
+                url_info = sanitize_youtube_url(url, preserve_metadata=True)
+                clean_url = url_info.clean_url
+                logger.debug(f"URL sanitized: {url} -> {clean_url}")
+                if url_info.timestamp:
+                    logger.debug(f"Timestamp detected: {url_info.timestamp}s (note: timestamp will be ignored for full download)")
+            except YouTubeURLError as e:
+                logger.error(f"Invalid YouTube URL: {e}")
+                return AudioDownloadResult(
+                    success=False,
+                    status=DownloadStatus.FAILED,
+                    error_message=f"Invalid YouTube URL: {e}",
+                    download_time_seconds=0
+                )
+            
             # Start monitoring
-            if not self.monitor.start_download_monitoring(download_id, url):
+            if not self.monitor.start_download_monitoring(download_id, clean_url):
                 logger.error("Failed to start download monitoring - network issues detected")
                 return AudioDownloadResult(
                     success=False,
@@ -266,7 +283,7 @@ class AudioDownloader:
             
             # Get video info first
             try:
-                video_info = self.get_video_info(url)
+                video_info = self.get_video_info(clean_url)
                 title = video_info.get('title', 'Unknown')
                 duration = video_info.get('duration', 0)
             except AudioDownloadError as e:
@@ -317,8 +334,8 @@ class AudioDownloader:
                 
                 ydl.add_progress_hook(progress_hook)
                 
-                # Extract info and download
-                info = ydl.extract_info(url, download=True)
+                # Extract info and download using clean URL
+                info = ydl.extract_info(clean_url, download=True)
                 
                 if not info:
                     self.monitor.complete_download(download_id, False, "Download failed - no info extracted")
@@ -503,13 +520,14 @@ class AudioDownloader:
             True if URL is valid and supported
         """
         try:
-            # Basic URL validation
-            if not url.startswith(('https://www.youtube.com/', 'https://youtu.be/', 'youtube.com/', 'youtu.be/')):
-                return False
+            # Use URL sanitizer for comprehensive validation
+            url_info = sanitize_youtube_url(url, preserve_metadata=False)
             
-            # Try to extract info to validate
-            self.get_video_info(url)
+            # Try to extract info to validate with yt-dlp
+            self.get_video_info(url_info.clean_url)
             return True
             
+        except (YouTubeURLError, AudioDownloadError):
+            return False
         except Exception:
             return False

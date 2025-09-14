@@ -20,6 +20,7 @@ sys.path.insert(0, str(PROJECT_ROOT / "src"))
 from src.common import setup_logging, create_session, get_session, get_session_manager
 from .audio_core import AudioDownloader, AudioDownloadError, DownloadStatus, DEFAULT_QUALITY, DEFAULT_FORMAT
 from src.common.download_monitor import get_global_monitor
+from src.common.url_utils import sanitize_youtube_url, YouTubeURLError
 
 # Initialize logger
 logger = logging.getLogger("audio_cli")
@@ -96,7 +97,34 @@ class AudioDownloadCLI:
             True if download successful, False otherwise
         """
         try:
-            print(f"Starting download: {url}")
+            # Sanitize URL and show user feedback
+            try:
+                url_info = sanitize_youtube_url(url, preserve_metadata=True)
+                clean_url = url_info.clean_url
+                
+                print(f"🔗 Processing URL: {url}")
+                if url != clean_url:
+                    print(f"   ✅ Sanitized to: {clean_url}")
+                
+                # Show detected metadata
+                if url_info.timestamp:
+                    minutes, seconds = divmod(url_info.timestamp, 60)
+                    if minutes > 0:
+                        print(f"   ⏰ Timestamp detected: {minutes}m{seconds}s (will download full video)")
+                    else:
+                        print(f"   ⏰ Timestamp detected: {seconds}s (will download full video)")
+                
+                if url_info.playlist_id:
+                    print(f"   📋 Playlist detected: {url_info.playlist_id} (will download single video)")
+                
+                # Use clean URL for processing
+                url = clean_url
+                
+            except YouTubeURLError as e:
+                print(f"❌ Invalid YouTube URL: {e}")
+                return False
+            
+            print(f"🚀 Starting download: {url}")
             
             # Create session
             session_uuid = self.create_or_get_session()

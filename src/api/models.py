@@ -27,7 +27,7 @@ class SessionResponse(BaseModel):
 class JobRequest(BaseModel):
     """Request model for creating a new job."""
     url: HttpUrl = Field(..., description="URL to download (YouTube video URL)")
-    media_type: str = Field(default="video", regex="^(video|audio|transcript)$", 
+    media_type: str = Field(default="video", pattern="^(video|audio|transcript)$", 
                            description="Type of media to download")
     quality: Optional[str] = Field(default=None, description="Video/audio quality preference")
     output_format: Optional[str] = Field(default=None, description="Output format (mp4, mp3, etc.)")
@@ -39,7 +39,7 @@ class JobResponse(BaseModel):
     session_uuid: str
     job_url: str
     media_type: str
-    status: str = Field(..., regex="^(pending|processing|completed|failed|cancelled)$")
+    status: str = Field(..., pattern="^(pending|processing|completed|failed|cancelled)$")
     created_at: str
     started_at: Optional[str] = None
     completed_at: Optional[str] = None
@@ -51,7 +51,7 @@ class JobResponse(BaseModel):
 
 class JobStatusRequest(BaseModel):
     """Request model for updating job status."""
-    status: str = Field(..., regex="^(processing|completed|failed|cancelled)$")
+    status: str = Field(..., pattern="^(processing|completed|failed|cancelled)$")
     progress_percent: Optional[float] = Field(default=None, ge=0, le=100)
     error_message: Optional[str] = None
     output_path: Optional[str] = None
@@ -60,7 +60,7 @@ class JobStatusRequest(BaseModel):
 
 class HealthResponse(BaseModel):
     """Response model for system health status."""
-    status: str = Field(..., regex="^(healthy|degraded|unhealthy)$")
+    status: str = Field(..., pattern="^(healthy|degraded|unhealthy)$")
     timestamp: str
     version: str
     uptime_seconds: float

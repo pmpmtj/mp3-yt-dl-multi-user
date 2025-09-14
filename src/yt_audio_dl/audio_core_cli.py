@@ -8,6 +8,7 @@ from YouTube videos with session management integration.
 import argparse
 import sys
 import logging
+import time
 from pathlib import Path
 from typing import List, Optional
 
@@ -17,7 +18,8 @@ PROJECT_ROOT = SCRIPT_DIR.parent.parent
 sys.path.insert(0, str(PROJECT_ROOT / "src"))
 
 from src.common import setup_logging, create_session, get_session, get_session_manager
-from .audio_core import AudioDownloader, AudioDownloadError
+from .audio_core import AudioDownloader, AudioDownloadError, DownloadStatus
+from src.common.download_monitor import get_global_monitor, DownloadEvent
 
 # Initialize logger
 logger = logging.getLogger("audio_cli")
@@ -129,30 +131,64 @@ class AudioDownloadCLI:
                 return False
             
             try:
-                # Download with session integration
-                result = downloader.download_audio_with_session(
-                    url=url,
-                    session_uuid=session_uuid,
-                    job_uuid=job_uuid,
-                    progress_callback=self.progress_callback
-                )
+                # Download with session integration and retry logic
+                max_retries = 3
+                retry_delay = 5  # seconds
                 
-                if result.success:
-                    print(f"\n✅ Download successful!")
-                    print(f"   File: {result.output_path}")
-                    print(f"   Size: {result.file_size_bytes / (1024*1024):.1f} MB")
-                    print(f"   Duration: {result.duration_seconds:.0f} seconds" if result.duration_seconds else "   Duration: Unknown")
-                    print(f"   Title: {result.title}")
-                    if result.artist:
-                        print(f"   Artist: {result.artist}")
+                for attempt in range(max_retries):
+                    if attempt > 0:
+                        print(f"\n🔄 Retry attempt {attempt}/{max_retries - 1}...")
+                        time.sleep(retry_delay)
                     
-                    # Complete job in session manager
-                    self.session_manager.complete_job(session_uuid, result.file_size_bytes or 0)
-                    return True
-                else:
-                    print(f"\n❌ Download failed: {result.error_message}")
-                    self.session_manager.fail_job(session_uuid)
-                    return False
+                    result = downloader.download_audio_with_session(
+                        url=url,
+                        session_uuid=session_uuid,
+                        job_uuid=job_uuid,
+                        progress_callback=self.progress_callback
+                    )
+                    
+                    if result.success:
+                        print(f"\n✅ Download successful!")
+                        print(f"   File: {result.output_path}")
+                        print(f"   Size: {result.file_size_bytes / (1024*1024):.1f} MB")
+                        print(f"   Duration: {result.duration_seconds:.0f} seconds" if result.duration_seconds else "   Duration: Unknown")
+                        print(f"   Title: {result.title}")
+                        if result.artist:
+                            print(f"   Artist: {result.artist}")
+                        
+                        # Complete job in session manager
+                        self.session_manager.complete_job(session_uuid, result.file_size_bytes or 0)
+                        return True
+                    
+                    # Check if this is a retryable network error
+                    elif result.status == DownloadStatus.PENDING:
+                        print(f"\n⚠️  {result.error_message}")
+                        continue  # Retry
+                    
+                    # Check for network-related errors that should be retried
+                    elif any(network_error in result.error_message.lower() for network_error in [
+                        'network', 'connection', 'timeout', 'resolve', 'getaddrinfo', 
+                        'bytes read', 'more expected', 'incomplete read', 'partial download',
+                        'connection broken', 'download interrupted'
+                    ]):
+                        print(f"\n⚠️  Network issue detected: {result.error_message}")
+                        if attempt < max_retries - 1:
+                            print(f"🔄 Will retry in {retry_delay} seconds...")
+                        continue
+                    else:
+                        # Non-retryable error
+                        print(f"\n❌ Download failed: {result.error_message}")
+                        self.session_manager.fail_job(session_uuid)
+                        return False
+                
+                # All retries exhausted
+                print(f"\n❌ Download failed after {max_retries} attempts due to persistent network issues.")
+                print("💡 Suggestions:")
+                print("   • Check your internet connection")
+                print("   • Try again in a few minutes") 
+                print("   • Check if YouTube is accessible in your region")
+                self.session_manager.fail_job(session_uuid)
+                return False
                     
             except Exception as e:
                 print(f"\n❌ Download error: {e}")
@@ -295,92 +331,52 @@ class AudioDownloadCLI:
 
 def main():
     """Main CLI entry point."""
-    parser = argparse.ArgumentParser(
-        description="YouTube Audio Downloader CLI",
-        formatter_class=argparse.RawDescriptionHelpFormatter,
-        epilog="""
-Examples:
-  # Download single video
-  python -m src.yt_audio_dl --url "https://youtube.com/watch?v=..." --output ./downloads
-  
-  # Download with custom quality and format
-  python -m src.yt_audio_dl --url "https://youtube.com/watch?v=..." --quality bestaudio --format mp3
-  
-  # Batch download from file
-  python -m src.yt_audio_dl --urls-file urls.txt --output ./downloads
-  
-  # Show session info
-  python -m src.yt_audio_dl --session-info
-  
-  # Show supported formats
-  python -m src.yt_audio_dl --formats
-        """
-    )
+    parser = argparse.ArgumentParser(description="YouTube Audio Downloader")
+    parser.add_argument("--url", required=True, help="YouTube video URL")
+    parser.add_argument("--output-dir", default="downloads", help="Output directory")
+    parser.add_argument("--quality", default="bestaudio", help="Audio quality")
+    parser.add_argument("--format", default="mp3", help="Output format")
+    parser.add_argument("--verbose", "-v", action="store_true", help="Verbose output")
     
-    # URL options (mutually exclusive)
-    url_group = parser.add_mutually_exclusive_group(required=False)
-    url_group.add_argument(
-        '--url', 
-        help='Single YouTube video URL to download'
-    )
-    url_group.add_argument(
-        '--urls-file', 
-        help='File containing YouTube URLs (one per line)'
-    )
-    url_group.add_argument(
-        '--session-info', 
-        action='store_true',
-        help='Show current session information'
-    )
-    url_group.add_argument(
-        '--formats', 
-        action='store_true',
-        help='Show supported audio formats'
-    )
-    
-    # Output options
-    parser.add_argument(
-        '--output', 
-        '--output-dir',
-        dest='output_dir',
-        default='./downloads',
-        help='Output directory for downloads (default: ./downloads)'
-    )
-    parser.add_argument(
-        '--filename',
-        help='Custom filename template (e.g., "%(title)s.%(ext)s")'
-    )
-    
-    # Quality and format options
-    parser.add_argument(
-        '--quality',
-        choices=['bestaudio', 'worstaudio', 'best', 'worst'],
-        default='bestaudio',
-        help='Audio quality preference (default: bestaudio)'
-    )
-    parser.add_argument(
-        '--format',
-        choices=['mp3', 'm4a', 'wav', 'flac', 'ogg', 'opus'],
-        default='mp3',
-        help='Output audio format (default: mp3)'
-    )
-    
-    # Other options
-    parser.add_argument(
-        '--verbose', '-v',
-        action='store_true',
-        help='Enable verbose logging'
-    )
-    
-    # Parse arguments and run
     args = parser.parse_args()
     
-    # Setup logging
-    setup_logging()
+    # Set up logging
+    if args.verbose:
+        logging.getLogger().setLevel(logging.DEBUG)
     
-    # Create and run CLI
-    cli = AudioDownloadCLI()
-    cli.run(args)
+    # Initialize download monitor
+    monitor = get_global_monitor()
+    
+    try:
+        # Check network connectivity first
+        network_result = monitor.check_network_connectivity()
+        if not network_result.is_online:
+            print(f"❌ Network Error: {network_result.error_message}")
+            print("Please check your internet connection and try again.")
+            return 1
+        
+        print("✅ Network connection verified")
+        
+        # Use the CLI class for proper session management
+        cli = AudioDownloadCLI()
+        
+        # Download with session support for proper multiuser directory structure
+        print(f"Starting download: {args.url}")
+        success = cli.download_single_url(
+            url=args.url,
+            output_dir=Path(args.output_dir),
+            quality=args.quality,
+            format=args.format
+        )
+        
+        return 0 if success else 1
+            
+    except KeyboardInterrupt:
+        print("\n⚠️  Download cancelled by user")
+        return 1
+    except Exception as e:
+        print(f"❌ Unexpected error: {e}")
+        return 1
 
 
 if __name__ == "__main__":

@@ -39,6 +39,21 @@ LOGGING_CONFIG = {
             'mode': 'a',
             'level': 'ERROR',
         },
+        'monitor_file': {
+            'class': 'logging.handlers.RotatingFileHandler',
+            'filename': str(LOG_DIR / 'download_monitor.log'),
+            'maxBytes': 1024 * 1024,  # 1MB
+            'backupCount': 5,
+            'formatter': 'standard',
+            'mode': 'a',
+        },
+    },
+    'loggers': {
+        'download_monitor': {
+            'handlers': ['console', 'monitor_file'],
+            'level': 'INFO',
+            'propagate': False,
+        },
     },
 
     'root': {

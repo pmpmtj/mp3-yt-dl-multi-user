@@ -8,6 +8,7 @@ error handling, and integration with the session management system.
 import logging
 import os
 import time
+from src.common.download_monitor import get_global_monitor, DownloadEvent
 from typing import Optional, Dict, Any, Callable, Union
 from pathlib import Path
 from dataclasses import dataclass
@@ -138,6 +139,9 @@ class AudioDownloader:
         self.format = format
         self.progress_callback = progress_callback
         
+        # Initialize download monitor
+        self.monitor = get_global_monitor()
+
         # Ensure output directory exists
         self.output_dir.mkdir(parents=True, exist_ok=True)
         
@@ -243,20 +247,42 @@ class AudioDownloader:
             AudioDownloadError: If download fails
         """
         start_time = time.time()
+        download_id = f"download_{int(start_time)}_{hash(url) % 10000}"
         
         try:
             logger.info(f"Starting audio download: {url}")
+            
+            # Start monitoring
+            if not self.monitor.start_download_monitoring(download_id, url):
+                logger.error("Failed to start download monitoring - network issues detected")
+                return AudioDownloadResult(
+                    success=False,
+                    status=DownloadStatus.FAILED,
+                    error_message="Network connectivity issues detected. Please check your internet connection.",
+                    download_time_seconds=0
+                )
             
             # Get video info first
             try:
                 video_info = self.get_video_info(url)
                 title = video_info.get('title', 'Unknown')
                 duration = video_info.get('duration', 0)
-            except AudioDownloadError:
-                # If we can't get info, proceed with download anyway
-                title = "Unknown"
-                duration = 0
-                video_info = {}
+            except AudioDownloadError as e:
+                # Handle network errors gracefully
+                if "Failed to resolve" in str(e) or "getaddrinfo failed" in str(e):
+                    logger.error(f"Network error detected: {e}")
+                    self.monitor.complete_download(download_id, False, f"Network error: {e}")
+                    return AudioDownloadResult(
+                        success=False,
+                        status=DownloadStatus.FAILED,
+                        error_message="Network error: Unable to connect to YouTube. Please check your internet connection.",
+                        download_time_seconds=time.time() - start_time
+                    )
+                else:
+                    # Other errors, proceed with download anyway
+                    title = "Unknown"
+                    duration = 0
+                    video_info = {}
             
             # Generate output filename if not provided
             if not output_filename:
@@ -280,14 +306,20 @@ class AudioDownloader:
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
                 logger.debug(f"Downloading with yt-dlp options: {ydl_opts}")
                 
-                # Add progress hook if callback is provided
-                if self.progress_callback:
-                    ydl.add_progress_hook(ProgressHook(self.progress_callback))
+                # Add progress hook for monitoring
+                def progress_hook(d):
+                    if d['status'] == 'downloading':
+                        self.monitor.update_download_progress(download_id, d)
+                    elif d['status'] == 'finished':
+                        logger.info(f"Download finished: {d['filename']}")
+                
+                ydl.add_progress_hook(progress_hook)
                 
                 # Extract info and download
                 info = ydl.extract_info(url, download=True)
                 
                 if not info:
+                    self.monitor.complete_download(download_id, False, "Download failed - no info extracted")
                     raise AudioDownloadError("Download failed - no info extracted")
                 
                 # Find the downloaded file
@@ -297,6 +329,7 @@ class AudioDownloader:
                         downloaded_files.append(file_path)
                 
                 if not downloaded_files:
+                    self.monitor.complete_download(download_id, False, "Download completed but no output file found")
                     raise AudioDownloadError("Download completed but no output file found")
                 
                 # Use the most recently modified file (should be our download)
@@ -305,6 +338,9 @@ class AudioDownloader:
                 # Get file size
                 file_size = output_file.stat().st_size
                 download_time = time.time() - start_time
+                
+                # Complete monitoring
+                self.monitor.complete_download(download_id, True)
                 
                 logger.info(f"Audio download completed: {output_file} ({file_size} bytes, "
                            f"{download_time:.1f}s)")
@@ -323,22 +359,83 @@ class AudioDownloader:
                 )
                 
         except yt_dlp.DownloadError as e:
+            error_str = str(e).lower()
             logger.error(f"yt-dlp download error for {url}: {e}")
-            return AudioDownloadResult(
-                success=False,
-                status=DownloadStatus.FAILED,
-                error_message=f"Download error: {e}",
-                download_time_seconds=time.time() - start_time
-            )
+            
+            # Check for network-related errors and provide user-friendly messages
+            if any(network_error in error_str for network_error in [
+                'failed to resolve', 'getaddrinfo failed', 'network is unreachable',
+                'connection timed out', 'connection refused', 'connection reset',
+                'unable to download webpage', 'http error 5', 'bytes read', 'more expected',
+                'connection broken', 'incomplete read', 'partial download', 'download interrupted'
+            ]):
+                # Try to handle network error with retry logic
+                retry_should_happen = self.monitor.handle_network_error(download_id, e)
+                logger.info(f"Monitor retry decision for {download_id}: {retry_should_happen}")
+                
+                if retry_should_happen:
+                    logger.info(f"Retrying download {download_id} after network error")
+                    # Return a special status to indicate retry should be attempted
+                    return AudioDownloadResult(
+                        success=False,
+                        status=DownloadStatus.PENDING,
+                        error_message=f"Network connectivity issue detected (attempt {self.monitor.active_downloads.get(download_id, type('', (), {'retry_count': 0})).retry_count}). Retrying...",
+                        download_time_seconds=time.time() - start_time
+                    )
+                else:
+                    # Max retries exceeded
+                    user_friendly_message = (
+                        "Network connectivity issues prevented the download. "
+                        "This could be due to:\n"
+                        "• Temporary internet connection problems\n"
+                        "• DNS resolution failures\n"
+                        "• YouTube server access issues\n"
+                        "Please check your internet connection and try again later."
+                    )
+                    return AudioDownloadResult(
+                        success=False,
+                        status=DownloadStatus.FAILED,
+                        error_message=user_friendly_message,
+                        download_time_seconds=time.time() - start_time
+                    )
+            else:
+                # Non-network related yt-dlp error
+                self.monitor.complete_download(download_id, False, f"Download error: {e}")
+                return AudioDownloadResult(
+                    success=False,
+                    status=DownloadStatus.FAILED,
+                    error_message=f"Download error: {e}",
+                    download_time_seconds=time.time() - start_time
+                )
         except Exception as e:
+            error_str = str(e).lower()
             logger.error(f"Unexpected error during audio download for {url}: {e}")
-            return AudioDownloadResult(
-                success=False,
-                status=DownloadStatus.FAILED,
-                error_message=f"Unexpected error: {e}",
-                download_time_seconds=time.time() - start_time
-            )
-    
+            
+            # Check for network-related exceptions
+            if any(network_error in error_str for network_error in [
+                'gaierror', 'socket.gaierror', 'connectionerror', 'timeout',
+                'failed to resolve', 'network', 'connection'
+            ]):
+                user_friendly_message = (
+                    "A network error occurred during download. This is usually temporary. "
+                    "Please check your internet connection and try again."
+                )
+                self.monitor.complete_download(download_id, False, user_friendly_message)
+                return AudioDownloadResult(
+                    success=False,
+                    status=DownloadStatus.FAILED,
+                    error_message=user_friendly_message,
+                    download_time_seconds=time.time() - start_time
+                )
+            else:
+                self.monitor.complete_download(download_id, False, f"Unexpected error: {e}")
+                return AudioDownloadResult(
+                    success=False,
+                    status=DownloadStatus.FAILED,
+                    error_message=f"Unexpected error: {e}",
+                    download_time_seconds=time.time() - start_time
+                )
+        
     def download_audio_with_session(self, 
                                    url: str,
                                    session_uuid: str,

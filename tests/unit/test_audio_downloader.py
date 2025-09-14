@@ -176,7 +176,7 @@ class TestAudioDownloader:
         output_file.write_text("fake audio content")
         
         # Mock glob to return our test file
-        with patch.object(temp_download_dir, 'glob') as mock_glob:
+        with patch('pathlib.Path.glob') as mock_glob:
             mock_glob.return_value = [output_file]
             
             result = downloader.download_audio("https://youtube.com/watch?v=test")
@@ -202,7 +202,7 @@ class TestAudioDownloader:
         output_file = temp_download_dir / "custom_name.mp3"
         output_file.write_text("fake audio content")
         
-        with patch.object(temp_download_dir, 'glob') as mock_glob:
+        with patch('pathlib.Path.glob') as mock_glob:
             mock_glob.return_value = [output_file]
             
             result = downloader.download_audio(
@@ -224,7 +224,7 @@ class TestAudioDownloader:
         mock_ydl_class.return_value.__enter__.return_value = mock_ydl_instance
         
         # Mock empty glob result (no output files)
-        with patch.object(temp_download_dir, 'glob') as mock_glob:
+        with patch('pathlib.Path.glob') as mock_glob:
             mock_glob.return_value = []
             
             result = downloader.download_audio("https://youtube.com/watch?v=test")
@@ -238,7 +238,7 @@ class TestAudioDownloader:
         """Test session-based audio download."""
         downloader = AudioDownloader(output_dir=temp_download_dir)
         
-        with patch.object(downloader, 'download_audio') as mock_download:
+        with patch('src.yt_audio_dl.audio_core.AudioDownloader.download_audio') as mock_download:
             mock_result = Mock()
             mock_result.success = True
             mock_result.output_path = temp_download_dir / "output.mp3"
@@ -259,7 +259,7 @@ class TestAudioDownloader:
         """Test session-based audio download with error."""
         downloader = AudioDownloader(output_dir=temp_download_dir)
         
-        with patch.object(downloader, 'download_audio') as mock_download:
+        with patch('src.yt_audio_dl.audio_core.AudioDownloader.download_audio') as mock_download:
             mock_download.side_effect = Exception("Download error")
             
             result = downloader.download_audio_with_session(

@@ -77,6 +77,8 @@ class ProgressHook:
                 self.downloaded_bytes = d.get('downloaded_bytes', 0)
                 progress_percent = (self.downloaded_bytes / self.total_bytes) * 100
             else:
+                # Still update downloaded_bytes even without total bytes
+                self.downloaded_bytes = d.get('downloaded_bytes', 0)
                 progress_percent = None
             
             # Extract speed and ETA
@@ -94,8 +96,11 @@ class ProgressHook:
                     'eta': self.eta
                 })
             
-            logger.debug(f"Download progress: {progress_percent:.1f}% "
-                        f"({self.downloaded_bytes}/{self.total_bytes} bytes)")
+            if progress_percent is not None:
+                logger.debug(f"Download progress: {progress_percent:.1f}% "
+                            f"({self.downloaded_bytes}/{self.total_bytes} bytes)")
+            else:
+                logger.debug(f"Download progress: {self.downloaded_bytes} bytes downloaded")
         
         elif d['status'] == 'finished':
             logger.info(f"Download finished: {d['filename']}")

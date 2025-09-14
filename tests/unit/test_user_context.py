@@ -101,13 +101,15 @@ class TestUserContext:
         context = UserContext()
         test_url = "https://youtube.com/watch?v=test"
         
-        with patch.object(context, 'get_url_uuid') as mock_get_uuid:
+        with patch.object(context, 'get_url_uuid') as mock_get_uuid, \
+             patch.object(context, '_path_generator') as mock_path_generator:
             mock_get_uuid.return_value = "test-job-uuid"
+            mock_path_generator.return_value = Path("/test/audio/path")
             
             path = context.get_audio_download_path(test_url)
             
             # Should call the path generator with correct parameters
-            context._path_generator.assert_called_with(
+            mock_path_generator.assert_called_with(
                 context.session_uuid, "test-job-uuid", "audio", None
             )
     
@@ -117,12 +119,14 @@ class TestUserContext:
         context = UserContext()
         test_url = "https://youtube.com/watch?v=test"
         
-        with patch.object(context, 'get_url_uuid') as mock_get_uuid:
+        with patch.object(context, 'get_url_uuid') as mock_get_uuid, \
+             patch.object(context, '_path_generator') as mock_path_generator:
             mock_get_uuid.return_value = "test-job-uuid"
+            mock_path_generator.return_value = Path("/test/video/path")
             
             path = context.get_video_download_path(test_url)
             
-            context._path_generator.assert_called_with(
+            mock_path_generator.assert_called_with(
                 context.session_uuid, "test-job-uuid", "video", None
             )
     
@@ -132,12 +136,14 @@ class TestUserContext:
         context = UserContext()
         test_url = "https://youtube.com/watch?v=test"
         
-        with patch.object(context, 'get_url_uuid') as mock_get_uuid:
+        with patch.object(context, 'get_url_uuid') as mock_get_uuid, \
+             patch.object(context, '_path_generator') as mock_path_generator:
             mock_get_uuid.return_value = "test-job-uuid"
+            mock_path_generator.return_value = Path("/test/transcript/path")
             
             path = context.get_transcript_download_path(test_url)
             
-            context._path_generator.assert_called_with(
+            mock_path_generator.assert_called_with(
                 context.session_uuid, "test-job-uuid", "transcripts", None
             )
     

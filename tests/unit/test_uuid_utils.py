@@ -10,8 +10,7 @@ from unittest.mock import patch
 from src.common.uuid_utils import (
     generate_session_uuid, 
     generate_job_uuid, 
-    generate_uuid,
-    generate_video_uuid
+    generate_uuid
 )
 
 
@@ -67,12 +66,6 @@ class TestUUIDGeneration:
         assert isinstance(uuid, str)
         assert len(uuid) > 0
     
-    @pytest.mark.unit
-    def test_generate_video_uuid_deprecated(self):
-        """Test that generate_video_uuid still works (deprecated)."""
-        uuid = generate_video_uuid()
-        assert isinstance(uuid, str)
-        assert len(uuid) > 0
     
     @pytest.mark.unit
     def test_uuid_format_is_valid(self):
@@ -89,11 +82,10 @@ class TestUUIDGeneration:
         """Test that different UUID types generate unique values."""
         session_uuid = generate_session_uuid()
         job_uuid = generate_job_uuid()
-        video_uuid = generate_video_uuid()
         prefixed_uuid = generate_uuid("test")
         
-        uuids = [session_uuid, job_uuid, video_uuid, prefixed_uuid]
-        assert len(set(uuids)) == 4, "All different UUID types should be unique"
+        uuids = [session_uuid, job_uuid, prefixed_uuid]
+        assert len(set(uuids)) == 3, "All different UUID types should be unique"
     
     @pytest.mark.unit
     @patch('src.common.uuid_utils.logger')
@@ -110,8 +102,7 @@ class TestUUIDGeneration:
             generate_session_uuid(),
             generate_job_uuid(),
             generate_uuid(),
-            generate_uuid("test"),
-            generate_video_uuid()
+            generate_uuid("test")
         ]
         
         for uuid in uuids:

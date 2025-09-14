@@ -18,6 +18,7 @@ from .models import (
     ErrorResponse
 )
 from ..common import get_session_manager, get_session
+from ..yt_audio_dl import AudioDownloader, AudioDownloadError
 
 # Initialize logger
 logger = logging.getLogger("api.jobs")
@@ -335,8 +336,7 @@ async def process_download_job(job_id: str, job_request: JobRequest):
     """
     Background task to process a download job.
     
-    This is a placeholder for the actual download processing logic.
-    In a real implementation, this would use yt-dlp to download the content.
+    This processes the actual download using the audio downloader.
     
     Args:
         job_id: The job ID to process
@@ -345,24 +345,102 @@ async def process_download_job(job_id: str, job_request: JobRequest):
     try:
         logger.info(f"Starting background processing for job {job_id}")
         
+        # Get job data
+        if job_id not in job_storage:
+            logger.error(f"Job {job_id} not found in storage")
+            return
+        
+        job_data = job_storage[job_id]
+        session_uuid = job_data["session_uuid"]
+        job_uuid = job_data["job_uuid"]
+        
         # Update job status to processing
-        if job_id in job_storage:
-            job_storage[job_id]["status"] = "processing"
-            job_storage[job_id]["started_at"] = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
-            job_storage[job_id]["progress_percent"] = 0
+        job_storage[job_id]["status"] = "processing"
+        job_storage[job_id]["started_at"] = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+        job_storage[job_id]["progress_percent"] = 0
         
-        # Simulate download processing
-        for progress in range(0, 101, 10):
-            await asyncio.sleep(0.5)  # Simulate processing time
+        # Get user context
+        session_manager = get_session_manager()
+        user_context = session_manager.get_session(session_uuid)
+        
+        if not user_context:
+            raise Exception("Session not found or inactive")
+        
+        # Get download path
+        if job_request.media_type == "audio":
+            download_path = user_context.get_audio_download_path(str(job_request.url))
+        elif job_request.media_type == "video":
+            download_path = user_context.get_video_download_path(str(job_request.url))
+        elif job_request.media_type == "transcript":
+            download_path = user_context.get_transcript_download_path(str(job_request.url))
+        else:
+            raise Exception(f"Unsupported media type: {job_request.media_type}")
+        
+        # Ensure download directory exists
+        download_path.mkdir(parents=True, exist_ok=True)
+        
+        # Progress callback for real-time updates
+        def progress_callback(progress_data):
             if job_id in job_storage:
-                job_storage[job_id]["progress_percent"] = progress
+                if progress_data['status'] == 'downloading':
+                    job_storage[job_id]["progress_percent"] = progress_data.get('progress_percent', 0)
+                elif progress_data['status'] == 'finished':
+                    job_storage[job_id]["progress_percent"] = 100
         
-        # Simulate completion
-        if job_id in job_storage:
-            job_storage[job_id]["status"] = "completed"
+        # Process based on media type
+        if job_request.media_type == "audio":
+            # Audio download
+            downloader = AudioDownloader(
+                output_dir=download_path.parent,
+                quality=job_request.quality or "bestaudio",
+                format=job_request.output_format or "mp3",
+                progress_callback=progress_callback
+            )
+            
+            # Download the audio
+            result = downloader.download_audio_with_session(
+                url=str(job_request.url),
+                session_uuid=session_uuid,
+                job_uuid=job_uuid,
+                progress_callback=progress_callback
+            )
+            
+            if result.success:
+                # Update job with success
+                job_storage[job_id]["status"] = "completed"
+                job_storage[job_id]["completed_at"] = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+                job_storage[job_id]["progress_percent"] = 100
+                job_storage[job_id]["output_path"] = str(result.output_path)
+                job_storage[job_id]["file_size_bytes"] = result.file_size_bytes
+                
+                # Complete job in session manager
+                session_manager.complete_job(session_uuid, result.file_size_bytes or 0)
+                
+                logger.info(f"Audio download completed for job {job_id}: {result.output_path}")
+            else:
+                # Update job with failure
+                job_storage[job_id]["status"] = "failed"
+                job_storage[job_id]["completed_at"] = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+                job_storage[job_id]["error_message"] = result.error_message
+                
+                # Fail job in session manager
+                session_manager.fail_job(session_uuid)
+                
+                logger.error(f"Audio download failed for job {job_id}: {result.error_message}")
+        
+        elif job_request.media_type == "video":
+            # Video download (placeholder for future implementation)
+            job_storage[job_id]["status"] = "failed"
             job_storage[job_id]["completed_at"] = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
-            job_storage[job_id]["progress_percent"] = 100
-            job_storage[job_id]["file_size_bytes"] = 1024 * 1024  # 1MB placeholder
+            job_storage[job_id]["error_message"] = "Video download not yet implemented"
+            session_manager.fail_job(session_uuid)
+            
+        elif job_request.media_type == "transcript":
+            # Transcript download (placeholder for future implementation)
+            job_storage[job_id]["status"] = "failed"
+            job_storage[job_id]["completed_at"] = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+            job_storage[job_id]["error_message"] = "Transcript download not yet implemented"
+            session_manager.fail_job(session_uuid)
         
         logger.info(f"Completed background processing for job {job_id}")
         
@@ -372,3 +450,10 @@ async def process_download_job(job_id: str, job_request: JobRequest):
             job_storage[job_id]["status"] = "failed"
             job_storage[job_id]["error_message"] = str(e)
             job_storage[job_id]["completed_at"] = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+            
+            # Fail job in session manager
+            try:
+                session_manager = get_session_manager()
+                session_manager.fail_job(job_data["session_uuid"])
+            except:
+                pass

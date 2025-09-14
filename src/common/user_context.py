@@ -10,7 +10,7 @@ from typing import Optional, Dict, Any, Union, Callable
 from pathlib import Path
 
 # Import UUID functions from uuid_utils
-from .uuid_utils import generate_session_uuid, generate_video_uuid
+from .uuid_utils import generate_session_uuid, generate_job_uuid
 
 # Initialize logger for this module
 logger = logging.getLogger("user_context")
@@ -39,19 +39,19 @@ class UserContext:
             base_download_dir: Base directory for downloads (uses config default if None)
         """
         self.session_uuid = session_uuid or generate_session_uuid()
-        self._video_sessions: Dict[str, str] = {}  # video_url -> video_uuid mapping
+        self._job_sessions: Dict[str, str] = {}  # job_url -> job_uuid mapping
         self._path_generator = path_generator or self._default_path_generator
         self._base_download_dir = base_download_dir
         logger.info(f"Initialized user context with session: {self.session_uuid}")
     
-    def _default_path_generator(self, session_uuid: str, video_uuid: str, 
+    def _default_path_generator(self, session_uuid: str, job_uuid: str, 
                                media_type: str, base_dir: Optional[Union[str, Path]] = None) -> Path:
         """
         Default path generator using simple directory structure.
         
         Args:
             session_uuid: Session identifier
-            video_uuid: Video identifier
+            job_uuid: Job identifier
             media_type: Media type (audio, video, transcripts)
             base_dir: Base directory for downloads
             
@@ -61,7 +61,7 @@ class UserContext:
         if base_dir is None:
             base_dir = self._base_download_dir or "./downloads"
         
-        return Path(base_dir) / session_uuid / video_uuid / media_type
+        return Path(base_dir) / session_uuid / job_uuid / media_type
     
     def get_session_id(self) -> str:
         """
@@ -72,66 +72,66 @@ class UserContext:
         """
         return self.session_uuid
     
-    def get_url_uuid(self, video_url: str) -> str:
+    def get_url_uuid(self, job_url: str) -> str:
         """
-        Get or create a video UUID for a given video URL.
+        Get or create a job UUID for a given job URL.
         
-        This ensures the same video URL always gets the same video UUID
+        This ensures the same job URL always gets the same job UUID
         within a session, enabling proper file organization.
         
         Args:
-            video_url: YouTube video URL
+            job_url: Job URL (e.g., YouTube video URL)
             
         Returns:
-            Video UUID string
+            Job UUID string
         """
-        if video_url not in self._video_sessions:
-            self._video_sessions[video_url] = generate_video_uuid()
-            logger.debug(f"Created video UUID for URL: {video_url} -> {self._video_sessions[video_url]}")
+        if job_url not in self._job_sessions:
+            self._job_sessions[job_url] = generate_job_uuid()
+            logger.debug(f"Created job UUID for URL: {job_url} -> {self._job_sessions[job_url]}")
         
-        return self._video_sessions[video_url]
+        return self._job_sessions[job_url]
     
-    def get_audio_download_path(self, video_url: str, base_dir: Optional[Union[str, Path]] = None) -> Path:
+    def get_audio_download_path(self, job_url: str, base_dir: Optional[Union[str, Path]] = None) -> Path:
         """
-        Get the audio download path for a video in this user's session.
+        Get the audio download path for a job in this user's session.
         
         Args:
-            video_url: YouTube video URL
+            job_url: Job URL (e.g., YouTube video URL)
             base_dir: Base downloads directory (uses instance default if None)
             
         Returns:
             Path to the audio download directory
         """
-        video_uuid = self.get_url_uuid(video_url)
-        return self._path_generator(self.session_uuid, video_uuid, "audio", base_dir)
+        job_uuid = self.get_url_uuid(job_url)
+        return self._path_generator(self.session_uuid, job_uuid, "audio", base_dir)
     
-    def get_video_download_path(self, video_url: str, base_dir: Optional[Union[str, Path]] = None) -> Path:
+    def get_video_download_path(self, job_url: str, base_dir: Optional[Union[str, Path]] = None) -> Path:
         """
-        Get the video download path for a video in this user's session.
+        Get the video download path for a job in this user's session.
         
         Args:
-            video_url: YouTube video URL
+            job_url: Job URL (e.g., YouTube video URL)
             base_dir: Base downloads directory (uses instance default if None)
             
         Returns:
             Path to the video download directory
         """
-        video_uuid = self.get_url_uuid(video_url)
-        return self._path_generator(self.session_uuid, video_uuid, "video", base_dir)
+        job_uuid = self.get_url_uuid(job_url)
+        return self._path_generator(self.session_uuid, job_uuid, "video", base_dir)
     
-    def get_transcript_download_path(self, video_url: str, base_dir: Optional[Union[str, Path]] = None) -> Path:
+    def get_transcript_download_path(self, job_url: str, base_dir: Optional[Union[str, Path]] = None) -> Path:
         """
-        Get the transcript download path for a video in this user's session.
+        Get the transcript download path for a job in this user's session.
         
         Args:
-            video_url: YouTube video URL
+            job_url: Job URL (e.g., YouTube video URL)
             base_dir: Base downloads directory (uses instance default if None)
             
         Returns:
             Path to the transcript download directory
         """
-        video_uuid = self.get_url_uuid(video_url)
-        return self._path_generator(self.session_uuid, video_uuid, "transcripts", base_dir)
+        job_uuid = self.get_url_uuid(job_url)
+        return self._path_generator(self.session_uuid, job_uuid, "transcripts", base_dir)
     
     def get_session_info(self) -> Dict[str, Any]:
         """
@@ -142,25 +142,25 @@ class UserContext:
         """
         return {
             'session_uuid': self.session_uuid,
-            'total_videos': len(self._video_sessions),
-            'video_urls': list(self._video_sessions.keys()),
-            'video_uuids': list(self._video_sessions.values())
+            'total_jobs': len(self._job_sessions),
+            'job_urls': list(self._job_sessions.keys()),
+            'job_uuids': list(self._job_sessions.values())
         }
     
-    def get_video_info(self, video_url: str) -> Dict[str, str]:
+    def get_job_info(self, job_url: str) -> Dict[str, str]:
         """
-        Get information about a specific video in this session.
+        Get information about a specific job in this session.
         
         Args:
-            video_url: YouTube video URL
+            job_url: Job URL (e.g., YouTube video URL)
             
         Returns:
-            Dictionary with video information
+            Dictionary with job information
         """
-        video_uuid = self.get_url_uuid(video_url)
+        job_uuid = self.get_url_uuid(job_url)
         return {
-            'video_url': video_url,
-            'video_uuid': video_uuid,
+            'job_url': job_url,
+            'job_uuid': job_uuid,
             'session_uuid': self.session_uuid
         }
 

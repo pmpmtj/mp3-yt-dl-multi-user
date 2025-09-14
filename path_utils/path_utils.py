@@ -79,26 +79,26 @@ def ensure_directory_exists(path: Union[str, Path], log_creation: bool = False) 
 
 
 def create_download_structure(base_dir: Union[str, Path], session_uuid: str, 
-                            video_uuid: str, media_type: str) -> Path:
+                            job_uuid: str, media_type: str) -> Path:
     """
     Create the download directory structure for multiuser support.
     
-    Creates a hierarchical structure: base_dir/session_uuid/video_uuid/media_type/
+    Creates a hierarchical structure: base_dir/session_uuid/job_uuid/media_type/
     
     Args:
         base_dir: Base downloads directory
         session_uuid: Session identifier (user session)
-        video_uuid: Video identifier (unique per video download)
+        job_uuid: Job identifier (unique per download job)
         media_type: Media type (audio, video, transcripts)
     
     Returns:
         Path to the created directory
         
     Example:
-        create_download_structure("./downloads", "session-123", "video-456", "audio")
-        # Returns: Path("./downloads/session-123/video-456/audio")
+        create_download_structure("./downloads", "session-123", "job-456", "audio")
+        # Returns: Path("./downloads/session-123/job-456/audio")
     """
-    download_path = Path(base_dir) / session_uuid / video_uuid / media_type
+    download_path = Path(base_dir) / session_uuid / job_uuid / media_type
     created_path = ensure_directory_exists(download_path, log_creation=True)
     logger.debug(f"Created download structure: {created_path}")
     return created_path

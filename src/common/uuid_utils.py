@@ -24,18 +24,16 @@ def generate_session_uuid() -> str:
     logger.debug(f"Generated session UUID: {session_id}")
     return session_id
 
-
-def generate_video_uuid() -> str:
+def generate_job_uuid() -> str:
     """
-    Generate a unique video identifier for multiuser support.
+    Generate a unique job identifier for multiuser support.
     
     Returns:
         String representation of a UUID4
     """
-    video_id = str(uuid.uuid4())
-    logger.debug(f"Generated video UUID: {video_id}")
-    return video_id
-
+    job_id = str(uuid.uuid4())
+    logger.debug(f"Generated job UUID: {job_id}")
+    return job_id
 
 def generate_uuid(prefix: Optional[str] = None) -> str:
     """

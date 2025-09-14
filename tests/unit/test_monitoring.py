@@ -84,7 +84,7 @@ def main():
     
     # Set up monitoring
     monitor = setup_download_monitoring()
-    monitor.add_event_callback(test_event_callback)
+    monitor.add_event_callback(event_callback_function)
     
     # Test network connectivity
     print("Testing network connectivity...")

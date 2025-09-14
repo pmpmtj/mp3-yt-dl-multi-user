@@ -86,8 +86,8 @@ async def create_download_job(
             "session_uuid": session_uuid,
             "job_url": str(job_request.url),
             "media_type": job_request.media_type,
-            "quality": job_request.quality,
-            "output_format": job_request.output_format,
+            "quality": "best" if job_request.media_type == "audio" else job_request.quality,
+            "output_format": "mp3" if job_request.media_type == "audio" else job_request.output_format,
             "status": "pending",
             "created_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
             "started_at": None,
@@ -392,8 +392,6 @@ async def process_download_job(job_id: str, job_request: JobRequest):
             # Audio download
             downloader = AudioDownloader(
                 output_dir=download_path.parent,
-                quality=job_request.quality or "bestaudio",
-                format=job_request.output_format or "mp3",
                 progress_callback=progress_callback
             )
             

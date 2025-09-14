@@ -30,7 +30,7 @@ class JobRequest(BaseModel):
     media_type: str = Field(default="video", pattern="^(video|audio|transcript)$", 
                            description="Type of media to download")
     quality: Optional[str] = Field(default=None, description="Video/audio quality preference")
-    output_format: Optional[str] = Field(default=None, description="Output format (mp4, mp3, etc.)")
+    output_format: Optional[str] = Field(default="mp3", description="Output format (always mp3 for audio)")
 
 
 class JobResponse(BaseModel):

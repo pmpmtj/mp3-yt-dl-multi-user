@@ -66,7 +66,7 @@ python -m src.yt_audio_dl --url "https://youtube.com/watch?v=..." --output ./dow
 
 #### **Download Audio**
 ```bash
-python -m src.yt_audio_dl --url "https://youtube.com/watch?v=..."
+python -m src.yt_audio_dl --url "https://youtube.com/watch?v=..." 
 ```
 
 #### **Batch Download from File**

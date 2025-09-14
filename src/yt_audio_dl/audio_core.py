@@ -6,9 +6,8 @@ error handling, and integration with the session management system.
 """
 
 import logging
-import os
 import time
-from src.common.download_monitor import get_global_monitor, DownloadEvent
+from src.common.download_monitor import get_global_monitor
 from typing import Optional, Dict, Any, Callable, Union
 from pathlib import Path
 from dataclasses import dataclass
@@ -18,6 +17,11 @@ import yt_dlp
 
 # Initialize logger
 logger = logging.getLogger("audio_core")
+
+# Constants for audio download configuration
+DEFAULT_QUALITY = "best"
+DEFAULT_FORMAT = "mp3"
+DEFAULT_BITRATE = "192"  # kbps
 
 
 class DownloadStatus(Enum):
@@ -118,25 +122,23 @@ class AudioDownloader:
     
     Provides audio download functionality with progress tracking,
     error handling, and session integration.
+    
+    All downloads are performed with best quality and MP3 format.
     """
     
     def __init__(self, 
                  output_dir: Union[str, Path],
-                 quality: str = "bestaudio",
-                 format: str = "mp3",
                  progress_callback: Optional[Callable] = None):
         """
         Initialize the audio downloader.
         
         Args:
             output_dir: Directory to save downloaded files
-            quality: Audio quality preference (bestaudio, worstaudio, etc.)
-            format: Output format (mp3, m4a, wav, etc.)
             progress_callback: Optional callback for progress updates
         """
         self.output_dir = Path(output_dir)
-        self.quality = quality
-        self.format = format
+        self.quality = DEFAULT_QUALITY
+        self.format = DEFAULT_FORMAT
         self.progress_callback = progress_callback
         
         # Initialize download monitor
@@ -146,7 +148,7 @@ class AudioDownloader:
         self.output_dir.mkdir(parents=True, exist_ok=True)
         
         logger.info(f"AudioDownloader initialized: output_dir={self.output_dir}, "
-                   f"quality={quality}, format={format}")
+                   f"quality={DEFAULT_QUALITY}, format={DEFAULT_FORMAT}")
     
     def _get_ydl_opts(self, output_template: str) -> Dict[str, Any]:
         """
@@ -156,7 +158,7 @@ class AudioDownloader:
             output_template: Template for output filename
             
         Returns:
-            Dictionary of yt-dlp options
+            Dictionary of yt-dlp options configured for best quality MP3 download
         """
         return {
             'format': self.quality,
@@ -164,7 +166,7 @@ class AudioDownloader:
             'postprocessors': [{
                 'key': 'FFmpegExtractAudio',
                 'preferredcodec': self.format,
-                'preferredquality': '192',  # 192 kbps
+                'preferredquality': DEFAULT_BITRATE,
             }],
             'extractaudio': True,
             'audioformat': self.format,
@@ -463,8 +465,6 @@ class AudioDownloader:
             # Create a temporary downloader with session-specific output
             session_downloader = AudioDownloader(
                 output_dir=session_output_dir,
-                quality=self.quality,
-                format=self.format,
                 progress_callback=progress_callback
             )
             
@@ -491,9 +491,6 @@ class AudioDownloader:
         # This would require more complex implementation with threading
         logger.warning("Download cancellation not yet implemented")
     
-    def get_supported_formats(self) -> list:
-        """Get list of supported audio formats."""
-        return ['mp3', 'm4a', 'wav', 'flac', 'ogg', 'opus']
     
     def validate_url(self, url: str) -> bool:
         """

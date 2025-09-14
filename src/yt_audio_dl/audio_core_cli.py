@@ -18,8 +18,8 @@ PROJECT_ROOT = SCRIPT_DIR.parent.parent
 sys.path.insert(0, str(PROJECT_ROOT / "src"))
 
 from src.common import setup_logging, create_session, get_session, get_session_manager
-from .audio_core import AudioDownloader, AudioDownloadError, DownloadStatus
-from src.common.download_monitor import get_global_monitor, DownloadEvent
+from .audio_core import AudioDownloader, AudioDownloadError, DownloadStatus, DEFAULT_QUALITY, DEFAULT_FORMAT
+from src.common.download_monitor import get_global_monitor
 
 # Initialize logger
 logger = logging.getLogger("audio_cli")
@@ -81,17 +81,15 @@ class AudioDownloadCLI:
     def download_single_url(self, 
                            url: str, 
                            output_dir: Path,
-                           quality: str = "bestaudio",
-                           format: str = "mp3",
                            custom_filename: Optional[str] = None) -> bool:
         """
         Download audio from a single URL.
         
+        Downloads are always performed with best quality and MP3 format.
+        
         Args:
             url: YouTube video URL
             output_dir: Output directory for downloads
-            quality: Audio quality preference
-            format: Output audio format
             custom_filename: Optional custom filename
             
         Returns:
@@ -115,8 +113,6 @@ class AudioDownloadCLI:
             # Create downloader
             downloader = AudioDownloader(
                 output_dir=output_dir,
-                quality=quality,
-                format=format,
                 progress_callback=self.progress_callback
             )
             
@@ -201,17 +197,15 @@ class AudioDownloadCLI:
     
     def download_multiple_urls(self, 
                               urls: List[str], 
-                              output_dir: Path,
-                              quality: str = "bestaudio",
-                              format: str = "mp3") -> int:
+                              output_dir: Path) -> int:
         """
         Download audio from multiple URLs.
+        
+        Downloads are always performed with best quality and MP3 format.
         
         Args:
             urls: List of YouTube video URLs
             output_dir: Output directory for downloads
-            quality: Audio quality preference
-            format: Output audio format
             
         Returns:
             Number of successful downloads
@@ -225,7 +219,7 @@ class AudioDownloadCLI:
         for i, url in enumerate(urls, 1):
             print(f"\n[{i}/{total_urls}] Processing: {url}")
             
-            if self.download_single_url(url, output_dir, quality, format):
+            if self.download_single_url(url, output_dir):
                 successful_downloads += 1
             
             print("-" * 50)
@@ -254,13 +248,6 @@ class AudioDownloadCLI:
         except Exception as e:
             print(f"Error getting session info: {e}")
     
-    def show_supported_formats(self):
-        """Show supported audio formats."""
-        downloader = AudioDownloader(Path("./temp"))
-        formats = downloader.get_supported_formats()
-        print("Supported audio formats:")
-        for fmt in formats:
-            print(f"  - {fmt.upper()}")
     
     def run(self, args):
         """Run the CLI with parsed arguments."""
@@ -277,8 +264,6 @@ class AudioDownloadCLI:
                 success = self.download_single_url(
                     url=args.url,
                     output_dir=output_dir,
-                    quality=args.quality,
-                    format=args.format,
                     custom_filename=args.filename
                 )
                 sys.exit(0 if success else 1)
@@ -295,9 +280,7 @@ class AudioDownloadCLI:
                     
                     successful = self.download_multiple_urls(
                         urls=urls,
-                        output_dir=output_dir,
-                        quality=args.quality,
-                        format=args.format
+                        output_dir=output_dir
                     )
                     sys.exit(0 if successful > 0 else 1)
                     
@@ -309,10 +292,6 @@ class AudioDownloadCLI:
                 # Show session information
                 self.create_or_get_session()
                 self.show_session_info()
-            
-            elif args.formats:
-                # Show supported formats
-                self.show_supported_formats()
             
             else:
                 print("No action specified. Use --help for usage information.")
@@ -332,15 +311,26 @@ class AudioDownloadCLI:
 def main():
     """Main CLI entry point."""
     parser = argparse.ArgumentParser(description="YouTube Audio Downloader")
-    parser.add_argument("--url", required=True, help="YouTube video URL")
-    parser.add_argument("--output-dir", default="downloads", help="Output directory")
-    parser.add_argument("--quality", default="bestaudio", help="Audio quality")
-    parser.add_argument("--format", default="mp3", help="Output format")
-    parser.add_argument("--verbose", "-v", action="store_true", help="Verbose output")
+    
+    # URL options (one of these is required for downloads)
+    url_group = parser.add_mutually_exclusive_group()
+    url_group.add_argument("--url", help="Single YouTube video URL to download")
+    url_group.add_argument("--urls-file", help="File containing YouTube URLs (one per line)")
+    
+    # Other options
+    parser.add_argument("--output-dir", default="downloads", help="Output directory for downloads")
+    parser.add_argument("--filename", help="Custom filename template")
+    parser.add_argument("--session-info", action="store_true", help="Show current session information")
+    parser.add_argument("--verbose", "-v", action="store_true", help="Enable verbose logging")
     
     args = parser.parse_args()
     
-    # Set up logging
+    # Validate that either a URL option or --session-info is provided
+    if not (args.url or args.urls_file or args.session_info):
+        parser.error("At least one of --url, --urls-file, or --session-info must be provided")
+    
+    # Set up logging first
+    setup_logging()
     if args.verbose:
         logging.getLogger().setLevel(logging.DEBUG)
     
@@ -348,34 +338,29 @@ def main():
     monitor = get_global_monitor()
     
     try:
-        # Check network connectivity first
-        network_result = monitor.check_network_connectivity()
-        if not network_result.is_online:
-            print(f"❌ Network Error: {network_result.error_message}")
-            print("Please check your internet connection and try again.")
-            return 1
+        # Check network connectivity first (only for download operations)
+        if args.url or args.urls_file:
+            network_result = monitor.check_network_connectivity()
+            if not network_result.is_online:
+                print(f"❌ Network Error: {network_result.error_message}")
+                print("Please check your internet connection and try again.")
+                return 1
+            
+            print("✅ Network connection verified")
         
-        print("✅ Network connection verified")
-        
-        # Use the CLI class for proper session management
+        # Use the CLI class for all functionality
         cli = AudioDownloadCLI()
-        
-        # Download with session support for proper multiuser directory structure
-        print(f"Starting download: {args.url}")
-        success = cli.download_single_url(
-            url=args.url,
-            output_dir=Path(args.output_dir),
-            quality=args.quality,
-            format=args.format
-        )
-        
-        return 0 if success else 1
+        cli.run(args)
+        return 0
             
     except KeyboardInterrupt:
-        print("\n⚠️  Download cancelled by user")
+        print("\n⚠️  Operation cancelled by user")
         return 1
     except Exception as e:
         print(f"❌ Unexpected error: {e}")
+        if args.verbose:
+            import traceback
+            traceback.print_exc()
         return 1
 
 

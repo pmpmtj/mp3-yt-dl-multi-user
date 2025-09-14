@@ -144,7 +144,7 @@ class AudioDownloader:
         logger.info(f"AudioDownloader initialized: output_dir={self.output_dir}, "
                    f"quality={quality}, format={format}")
     
-    def get_ydl_opts(self, output_template: str) -> Dict[str, Any]:
+    def _get_ydl_opts(self, output_template: str) -> Dict[str, Any]:
         """
         Get yt-dlp options for audio download.
         
@@ -162,7 +162,6 @@ class AudioDownloader:
                 'preferredcodec': self.format,
                 'preferredquality': '192',  # 192 kbps
             }],
-            'progress_hooks': [ProgressHook(self.progress_callback)],
             'extractaudio': True,
             'audioformat': self.format,
             'noplaylist': True,  # Download single video, not playlist
@@ -267,7 +266,7 @@ class AudioDownloader:
                 output_filename = f"{safe_title}.%(ext)s"
             
             # Set up yt-dlp options
-            ydl_opts = self.get_ydl_opts(output_filename)
+            ydl_opts = self._get_ydl_opts(output_filename)
             
             # Add metadata if provided
             if metadata:
@@ -280,6 +279,10 @@ class AudioDownloader:
             # Download the audio
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
                 logger.debug(f"Downloading with yt-dlp options: {ydl_opts}")
+                
+                # Add progress hook if callback is provided
+                if self.progress_callback:
+                    ydl.add_progress_hook(ProgressHook(self.progress_callback))
                 
                 # Extract info and download
                 info = ydl.extract_info(url, download=True)

@@ -37,6 +37,7 @@ class SessionInfo:
     failed_jobs: int = 0
     storage_used_bytes: int = 0
     is_active: bool = True
+    age_hours: float = 0.0
     
     def update_activity(self) -> None:
         """Update the last activity timestamp."""
@@ -150,7 +151,8 @@ class SessionManager:
                 session_uuid=session_uuid,
                 user_context=user_context,
                 created_at=now,
-                last_activity=now
+                last_activity=now,
+                age_hours=0.0
             )
             
             self._sessions[session_uuid] = session_info
@@ -208,12 +210,15 @@ class SessionManager:
                 'age_hours': (datetime.now() - session_info.created_at).total_seconds() / 3600
             }
     
-    def start_job(self, session_uuid: str) -> bool:
+    def start_job(self, session_uuid: str, job_uuid: str = None, job_url: str = None, media_type: str = None) -> bool:
         """
         Start a new job for a session.
         
         Args:
             session_uuid: Session identifier
+            job_uuid: Optional job identifier
+            job_url: Optional job URL
+            media_type: Optional media type
             
         Returns:
             True if job started successfully, False if limits exceeded
@@ -261,6 +266,20 @@ class SessionManager:
                 self._sessions[session_uuid].fail_job()
                 logger.debug(f"Failed job for session {session_uuid}")
     
+    def update_session_storage(self, session_uuid: str, storage_bytes: int) -> None:
+        """
+        Update storage usage for a session.
+        
+        Args:
+            session_uuid: Session identifier
+            storage_bytes: Storage used in bytes
+        """
+        with self._lock:
+            if session_uuid in self._sessions:
+                self._sessions[session_uuid].storage_used_bytes = storage_bytes
+                self._sessions[session_uuid].update_activity()
+                logger.debug(f"Updated storage for session {session_uuid}: {storage_bytes} bytes")
+    
     def deactivate_session(self, session_uuid: str) -> None:
         """
         Deactivate a session.
@@ -273,15 +292,30 @@ class SessionManager:
                 self._sessions[session_uuid].deactivate()
                 logger.info(f"Deactivated session: {session_uuid}")
     
-    def get_active_sessions(self) -> List[str]:
+    def get_active_sessions(self) -> List[Dict[str, Any]]:
         """
-        Get list of active session UUIDs.
+        Get list of active session information.
         
         Returns:
-            List of active session UUIDs
+            List of active session info dictionaries
         """
         with self._lock:
-            return [uuid for uuid, info in self._sessions.items() if info.is_active]
+            active_sessions = []
+            for uuid, info in self._sessions.items():
+                if info.is_active:
+                    active_sessions.append({
+                        'session_uuid': info.session_uuid,
+                        'created_at': info.created_at.isoformat(),
+                        'last_activity': info.last_activity.isoformat(),
+                        'is_active': info.is_active,
+                        'total_jobs': info.total_jobs,
+                        'active_jobs': info.active_jobs,
+                        'completed_jobs': info.completed_jobs,
+                        'failed_jobs': info.failed_jobs,
+                        'storage_used_bytes': info.storage_used_bytes,
+                        'age_hours': (datetime.now() - info.created_at).total_seconds() / 3600
+                    })
+            return active_sessions
     
     def get_session_stats(self) -> Dict[str, Any]:
         """

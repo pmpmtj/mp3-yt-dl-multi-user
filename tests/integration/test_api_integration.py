@@ -49,7 +49,7 @@ class TestAPIIntegration:
     @pytest.mark.integration
     def test_health_endpoint_integration(self, client):
         """Test health endpoint integration."""
-        response = client.get("/api/api/health")
+        response = client.get("/api/health")
         assert response.status_code == 200
         
         data = response.json()

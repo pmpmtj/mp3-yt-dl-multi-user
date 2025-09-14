@@ -50,12 +50,11 @@ class TestAudioDownloader:
         """Test yt-dlp options generation."""
         downloader = AudioDownloader(output_dir=temp_download_dir)
         
-        opts = downloader.get_ydl_opts("%(title)s.%(ext)s")
+        opts = downloader._get_ydl_opts("%(title)s.%(ext)s")
         
         assert 'format' in opts
         assert 'outtmpl' in opts
         assert 'postprocessors' in opts
-        assert 'progress_hooks' in opts
         assert opts['format'] == 'bestaudio'
         assert 'extractaudio' in opts
         assert opts['audioformat'] == 'mp3'
@@ -69,7 +68,7 @@ class TestAudioDownloader:
             format="wav"
         )
         
-        opts = downloader.get_ydl_opts("%(title)s.%(ext)s")
+        opts = downloader._get_ydl_opts("%(title)s.%(ext)s")
         
         assert opts['format'] == 'worstaudio'
         assert opts['audioformat'] == 'wav'

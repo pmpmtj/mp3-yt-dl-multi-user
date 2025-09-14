@@ -26,7 +26,7 @@ def get_session_manager_dependency():
     return get_session_manager()
 
 
-@router.post("/", response_model=SessionResponse)
+@router.post("/", response_model=SessionResponse, status_code=201)
 async def create_new_session(
     request: Request,
     session_manager=Depends(get_session_manager_dependency)

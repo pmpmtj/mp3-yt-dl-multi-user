@@ -12,11 +12,7 @@ import time
 from pathlib import Path
 from typing import List, Optional
 
-# Add src directory to path
-SCRIPT_DIR = Path(__file__).resolve().parent
-PROJECT_ROOT = SCRIPT_DIR.parent.parent
-sys.path.insert(0, str(PROJECT_ROOT / "src"))
-
+# Project imports
 from src.common import setup_logging, create_session, get_session, get_session_manager
 from .audio_core import AudioDownloader, AudioDownloadError, DownloadStatus, DEFAULT_QUALITY, DEFAULT_FORMAT
 from src.common.download_monitor import get_global_monitor

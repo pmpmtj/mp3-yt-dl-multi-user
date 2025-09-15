@@ -121,7 +121,6 @@ LOGGING_CONFIG = {
             'interval': 1,
             'backupCount': 7,
             'formatter': 'detailed',
-            'mode': 'a',
             'encoding': 'utf-8',
         },
         

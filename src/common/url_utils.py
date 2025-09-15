@@ -40,20 +40,19 @@ class YouTubeURLSanitizer:
     Supports standard, short, embed, mobile, and playlist URLs.
     """
     
-    # YouTube URL patterns
+    # YouTube URL patterns (order matters - more specific patterns first)
     PATTERNS = {
-        'standard': [
-            r'(?:https?://)?(?:www\.)?youtube\.com/watch\?.*?v=([a-zA-Z0-9_-]{11})',
-            r'(?:https?://)?(?:m\.)?youtube\.com/watch\?.*?v=([a-zA-Z0-9_-]{11})',
-        ],
-        'short': [
-            r'(?:https?://)?youtu\.be/([a-zA-Z0-9_-]{11})',
+        'mobile': [
+            r'(?:https?://)?m\.youtube\.com/watch\?.*?v=([a-zA-Z0-9_-]{11})',
         ],
         'embed': [
             r'(?:https?://)?(?:www\.)?youtube\.com/embed/([a-zA-Z0-9_-]{11})',
         ],
-        'mobile': [
-            r'(?:https?://)?(?:m\.)?youtube\.com/watch\?.*?v=([a-zA-Z0-9_-]{11})',
+        'short': [
+            r'(?:https?://)?youtu\.be/([a-zA-Z0-9_-]{11})',
+        ],
+        'standard': [
+            r'(?:https?://)?(?:www\.)?youtube\.com/watch\?.*?v=([a-zA-Z0-9_-]{11})',
         ]
     }
     
@@ -239,28 +238,42 @@ class YouTubeURLSanitizer:
             if timestamp_str.isdigit():
                 return int(timestamp_str)
             
-            # Handle time formats with units
+            # Check for invalid characters first
+            if re.search(r'[^0-9hms]', timestamp_str):
+                return None
+            
+            # Check for invalid patterns (like starting with units)
+            if re.search(r'^[hms]', timestamp_str):
+                return None
+            
+            # Initialize total seconds
             total_seconds = 0
             
-            # Hours
+            # Parse hours
             hours_match = re.search(r'(\d+)h', timestamp_str)
             if hours_match:
                 total_seconds += int(hours_match.group(1)) * 3600
             
-            # Minutes
+            # Parse minutes - look for number followed by 'm'
             minutes_match = re.search(r'(\d+)m', timestamp_str)
             if minutes_match:
                 total_seconds += int(minutes_match.group(1)) * 60
             
-            # Seconds
-            seconds_match = re.search(r'(\d+)s?', timestamp_str)
+            # Parse seconds - look for number followed by 's' or at the end
+            seconds_match = re.search(r'(\d+)s', timestamp_str)
             if seconds_match:
                 total_seconds += int(seconds_match.group(1))
+            else:
+                # Check for trailing number without 's' (only if no other units found)
+                if not hours_match and not minutes_match:
+                    trailing_match = re.search(r'(\d+)$', timestamp_str)
+                    if trailing_match:
+                        total_seconds += int(trailing_match.group(1))
             
             return total_seconds if total_seconds > 0 else None
             
-        except (ValueError, AttributeError):
-            logger.warning(f"Could not parse timestamp: {timestamp_str}")
+        except (ValueError, AttributeError) as e:
+            logger.warning(f"Could not parse timestamp '{timestamp_str}': {e}")
             return None
     
     @classmethod

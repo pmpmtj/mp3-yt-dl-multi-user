@@ -48,7 +48,9 @@ Content-Type: application/json
     "quality": "best",
     "format": "mp3",
     "session_id": "session-uuid",
-    "job_id": "job-uuid"
+    "job_id": "job-uuid",
+    "database_session_id": "database-session-uuid",
+    "database_download_id": "database-download-uuid"
 }
 ```
 
@@ -175,13 +177,33 @@ Currently no rate limiting is implemented. For production use, consider implemen
 - Concurrent download limits
 - API key authentication
 
+## Database Integration
+
+The auto-download API automatically creates database entries for tracking:
+
+- **DownloadSession**: Created for each auto-download request
+- **AudioDownload**: Created for each individual download
+- **DownloadHistory**: Created upon successful completion
+
+**Database Fields Populated:**
+- Session name, status, timestamps
+- Download title, artist, duration, file size
+- File path, quality, format
+- Error messages (if failed)
+- Completion timestamps
+
+**Accessing Downloads:**
+- View in Django admin: `/admin/audio_dl/`
+- Query via Django ORM
+- Track via web interface (if user is logged in)
+
 ## Security Notes
 
 - No authentication required (public endpoint)
 - Only YouTube URLs are accepted
 - Files are stored in Django's MEDIA_ROOT
 - Temporary sessions are created for each request
-- No user data is stored or tracked
+- All downloads are tracked in the database
 
 ## Integration Tips
 

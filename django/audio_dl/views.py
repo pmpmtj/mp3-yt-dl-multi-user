@@ -492,6 +492,28 @@ def auto_download(request):
         # Get job UUID for this URL
         job_uuid = user_context.get_url_uuid(url)
         
+        # Initialize variables for database record
+        title = 'Unknown Title'
+        artist = 'Unknown Artist'
+        duration = 0
+        
+        # Create database entries for tracking
+        # Create a temporary download session in the database
+        download_session = DownloadSession.objects.create(
+            session_name=f"Auto-Download Session {session_uuid[:8]}",
+            status='in_progress'
+        )
+        
+        # Create the download record
+        download_record = AudioDownload.objects.create(
+            session=download_session,
+            url=url,
+            title=title,  # Will be updated after video info
+            artist=artist,  # Will be updated after video info
+            quality=quality,
+            status='downloading'
+        )
+        
         # Set up download directory using same structure as other downloads
         download_dir = Path(settings.MEDIA_ROOT) / 'downloads' / session_uuid / job_uuid
         download_dir.mkdir(parents=True, exist_ok=True)
@@ -501,22 +523,42 @@ def auto_download(request):
             output_dir=download_dir
         )
         
-        # Get video info first
+        # Get video info first and update database record
         try:
             video_info = downloader.get_video_info(url)
             title = video_info.get('title', 'Unknown Title')
             artist = video_info.get('uploader', 'Unknown Artist')
             duration = video_info.get('duration', 0)
+            
+            # Update database record with video info
+            download_record.title = title
+            download_record.artist = artist
+            if duration > 0:
+                from datetime import timedelta
+                download_record.duration = timedelta(seconds=duration)
+            download_record.save()
+            
         except Exception as e:
             logger.warning(f"Could not get video info: {e}")
-            title = 'Unknown Title'
-            artist = 'Unknown Artist'
-            duration = 0
+            # Keep the default values already set
         
         # Start the download
         result = downloader.download_audio(url)
         
         if result.success and result.output_path:
+            # Update database record with successful download info
+            download_record.status = 'completed'
+            download_record.file_path = str(result.output_path)
+            download_record.file_size = result.file_size_bytes
+            download_record.completed_at = timezone.now()
+            if result.error_message:
+                download_record.error_message = result.error_message
+            download_record.save()
+            
+            # Update session status
+            download_session.status = 'completed'
+            download_session.save()
+            
             # Convert duration to readable format
             duration_str = f"{int(duration // 60):02d}:{int(duration % 60):02d}" if duration > 0 else "00:00"
             
@@ -538,9 +580,20 @@ def auto_download(request):
                 'quality': quality,
                 'format': format_type,
                 'session_id': session_uuid,
-                'job_id': job_uuid
+                'job_id': job_uuid,
+                'database_session_id': str(download_session.id),
+                'database_download_id': str(download_record.id)
             })
         else:
+            # Update database record with failure info
+            download_record.status = 'failed'
+            download_record.error_message = result.error_message or 'Download failed'
+            download_record.save()
+            
+            # Update session status
+            download_session.status = 'failed'
+            download_session.save()
+            
             logger.error(f"Auto-download failed: {result.error_message}")
             return JsonResponse({
                 'success': False,
@@ -554,12 +607,34 @@ def auto_download(request):
         }, status=400)
     except AudioDownloadError as e:
         logger.error(f"Audio download error: {str(e)}")
+        # Update database record if it exists
+        try:
+            if 'download_record' in locals():
+                download_record.status = 'failed'
+                download_record.error_message = str(e)
+                download_record.save()
+            if 'download_session' in locals():
+                download_session.status = 'failed'
+                download_session.save()
+        except:
+            pass
         return JsonResponse({
             'success': False,
             'error': str(e)
         }, status=500)
     except Exception as e:
         logger.error(f"Unexpected error in auto-download: {str(e)}")
+        # Update database record if it exists
+        try:
+            if 'download_record' in locals():
+                download_record.status = 'failed'
+                download_record.error_message = f'Unexpected error: {str(e)}'
+                download_record.save()
+            if 'download_session' in locals():
+                download_session.status = 'failed'
+                download_session.save()
+        except:
+            pass
         return JsonResponse({
             'success': False,
             'error': f'Unexpected error: {str(e)}'

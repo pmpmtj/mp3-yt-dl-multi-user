@@ -14,7 +14,7 @@ logger = logging.getLogger("app_config")
 # Application configuration for video downloader
 APP_CONFIG = {
     "download": {
-        "download_path": "./downloads"
+        "download_path": "./django/my_downloader/media/downloads"
     },
     "video": {
         "ext": "mp4",

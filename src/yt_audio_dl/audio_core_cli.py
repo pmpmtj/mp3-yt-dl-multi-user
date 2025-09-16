@@ -342,7 +342,7 @@ def main():
     url_group.add_argument("--urls-file", help="File containing YouTube URLs (one per line)")
     
     # Other options
-    parser.add_argument("--output-dir", default="downloads", help="Output directory for downloads")
+    parser.add_argument("--output-dir", default="./django/my_downloader/media/downloads", help="Output directory for downloads")
     parser.add_argument("--filename", help="Custom filename template")
     parser.add_argument("--session-info", action="store_true", help="Show current session information")
     parser.add_argument("--verbose", "-v", action="store_true", help="Enable verbose logging")

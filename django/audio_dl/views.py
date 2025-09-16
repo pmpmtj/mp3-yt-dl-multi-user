@@ -38,10 +38,7 @@ from .forms import DownloadSessionForm, AudioDownloadForm
 logger = logging.getLogger('audio_dl')
 
 # Initialize logging if not already done
-try:
-    setup_logging()
-except:
-    pass
+# setup_logging will be called after imports are resolved
 
 
 def update_download_progress(download_id, progress_data):
@@ -185,8 +182,11 @@ def start_download(request, download_id):
         if str(project_root) not in sys.path:
             sys.path.insert(0, str(project_root))
             
-        from yt_audio_dl.audio_core import AudioDownloader, AudioDownloadError, DownloadStatus
-        from common.logging_config import setup_logging
+        from yt_audio_dl.audio_core import AudioDownloader, AudioDownloadError, DownloadStatus  # type: ignore
+        from common.logging_config import setup_logging  # type: ignore
+        
+        # Initialize logging after imports are resolved
+        setup_logging()
     except ImportError as e:
         logger.error(f"Failed to import audio downloader components: {e}")
         return JsonResponse({
@@ -201,8 +201,8 @@ def start_download(request, download_id):
         
         logger.info(f"Starting download for {download.title or download.url}")
         
-        # Set up download directory
-        download_dir = Path(settings.MEDIA_ROOT) / 'downloads' / str(download.session.id)
+        # Set up download directory using same structure as CLI
+        download_dir = Path(settings.MEDIA_ROOT) / 'downloads' / str(download.session.id) / str(download.id)
         download_dir.mkdir(parents=True, exist_ok=True)
         
         # Create audio downloader instance

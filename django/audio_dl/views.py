@@ -63,6 +63,12 @@ def index(request):
         'title': 'Audio Downloader',
         'description': 'Download audio from various sources with ease',
     }
+    
+    # Add recent sessions for authenticated users
+    if request.user.is_authenticated:
+        recent_sessions = DownloadSession.objects.filter(user=request.user).order_by('-created_at')[:5]
+        context['recent_sessions'] = recent_sessions
+    
     return render(request, 'audio_dl/index.html', context)
 
 

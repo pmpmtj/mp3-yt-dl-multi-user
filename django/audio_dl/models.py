@@ -111,6 +111,13 @@ class AudioDownload(models.Model):
             # If there are failed downloads but no active ones
             if not session.downloads.filter(status__in=['downloading', 'pending']).exists():
                 session.status = 'failed'
+        elif session.downloads.filter(status='cancelled').exists():
+            # If there are cancelled downloads but no active ones
+            if not session.downloads.filter(status__in=['downloading', 'pending']).exists():
+                # Check if all downloads are cancelled
+                cancelled_count = session.downloads.filter(status='cancelled').count()
+                if cancelled_count == session.total_downloads:
+                    session.status = 'cancelled'
         
         session.save(update_fields=['total_downloads', 'completed_downloads', 'status'])
 

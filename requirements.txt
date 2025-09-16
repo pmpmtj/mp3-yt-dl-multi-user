@@ -16,3 +16,5 @@ httpx>=0.24.0
 django
 django-rest-framework
 
+psycopg[binary]
+python-dotenv

@@ -1,0 +1,147 @@
+{% extends 'audio_dl/base.html' %}
+
+{% block page_title %}Welcome to Audio Downloader{% endblock %}
+
+{% block page_description %}
+Download audio from various sources with ease. Create sessions, manage downloads, and track your progress.
+{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-lg-8 mx-auto">
+        <!-- Hero Section -->
+        <div class="text-center mb-5">
+            <div class="mb-4">
+                <i class="fas fa-music fa-5x text-primary"></i>
+            </div>
+            <h2 class="display-5 mb-3">Start Downloading Audio</h2>
+            <p class="lead">
+                Create download sessions, add audio URLs, and manage your downloads efficiently.
+                All your downloads are organized and tracked in one place.
+            </p>
+        </div>
+
+        <!-- Features -->
+        <div class="row mb-5">
+            <div class="col-md-4 mb-4">
+                <div class="card h-100 text-center">
+                    <div class="card-body">
+                        <i class="fas fa-folder-plus fa-3x text-primary mb-3"></i>
+                        <h5 class="card-title">Create Sessions</h5>
+                        <p class="card-text">
+                            Organize your downloads into sessions for better management and tracking.
+                        </p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4 mb-4">
+                <div class="card h-100 text-center">
+                    <div class="card-body">
+                        <i class="fas fa-download fa-3x text-success mb-3"></i>
+                        <h5 class="card-title">Bulk Downloads</h5>
+                        <p class="card-text">
+                            Add multiple audio URLs at once and download them in parallel.
+                        </p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4 mb-4">
+                <div class="card h-100 text-center">
+                    <div class="card-body">
+                        <i class="fas fa-chart-line fa-3x text-info mb-3"></i>
+                        <h5 class="card-title">Track Progress</h5>
+                        <p class="card-text">
+                            Monitor download progress and get detailed statistics for each session.
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Quick Actions -->
+        {% if user.is_authenticated %}
+        <div class="row">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="card-title mb-0">
+                            <i class="fas fa-bolt me-2"></i>Quick Actions
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <a href="{% url 'audio_dl:create_session' %}" class="btn btn-primary btn-lg w-100">
+                                    <i class="fas fa-plus me-2"></i>Create New Session
+                                </a>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <a href="{% url 'audio_dl:session_list' %}" class="btn btn-outline-primary btn-lg w-100">
+                                    <i class="fas fa-list me-2"></i>View All Sessions
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% else %}
+        <div class="row">
+            <div class="col-12">
+                <div class="alert alert-info text-center">
+                    <h5 class="alert-heading">
+                        <i class="fas fa-info-circle me-2"></i>Get Started
+                    </h5>
+                    <p class="mb-3">
+                        Please log in to start creating download sessions and managing your audio downloads.
+                    </p>
+                    <a href="{% url 'admin:login' %}" class="btn btn-primary">
+                        <i class="fas fa-sign-in-alt me-2"></i>Login
+                    </a>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Recent Sessions (if authenticated) -->
+        {% if user.is_authenticated %}
+        <div class="row mt-5">
+            <div class="col-12">
+                <h4 class="mb-3">
+                    <i class="fas fa-clock me-2"></i>Recent Sessions
+                </h4>
+                {% if recent_sessions %}
+                <div class="list-group">
+                    {% for session in recent_sessions %}
+                    <a href="{% url 'audio_dl:session_detail' session.id %}" class="list-group-item list-group-item-action">
+                        <div class="d-flex w-100 justify-content-between">
+                            <h6 class="mb-1">{{ session.session_name }}</h6>
+                            <small class="text-muted">{{ session.created_at|timesince }} ago</small>
+                        </div>
+                        <div class="d-flex justify-content-between align-items-center">
+                            <small class="text-muted">
+                                <i class="fas fa-download me-1"></i>
+                                {{ session.completed_downloads }}/{{ session.total_downloads }} downloads
+                            </small>
+                            <span class="badge bg-{% if session.status == 'completed' %}success{% elif session.status == 'in_progress' %}warning{% else %}secondary{% endif %}">
+                                {{ session.get_status_display }}
+                            </span>
+                        </div>
+                    </a>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <div class="text-center text-muted py-4">
+                    <i class="fas fa-folder-open fa-3x mb-3"></i>
+                    <p>No sessions yet. Create your first session to get started!</p>
+                    <a href="{% url 'audio_dl:create_session' %}" class="btn btn-primary">
+                        <i class="fas fa-plus me-2"></i>Create First Session
+                    </a>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

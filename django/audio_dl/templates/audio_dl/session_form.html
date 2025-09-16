@@ -1,0 +1,104 @@
+{% extends 'audio_dl/base.html' %}
+
+{% block page_title %}Create New Session{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-8 col-lg-6">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-folder-plus me-2"></i>Create New Download Session
+                </h5>
+            </div>
+            <div class="card-body">
+                <form method="post">
+                    {% csrf_token %}
+                    
+                    <div class="mb-3">
+                        <label for="{{ form.session_name.id_for_label }}" class="form-label">
+                            {{ form.session_name.label }}
+                        </label>
+                        {{ form.session_name }}
+                        {% if form.session_name.help_text %}
+                        <div class="form-text">{{ form.session_name.help_text }}</div>
+                        {% endif %}
+                        {% if form.session_name.errors %}
+                        <div class="invalid-feedback d-block">
+                            {% for error in form.session_name.errors %}
+                                {{ error }}
+                            {% endfor %}
+                        </div>
+                        {% endif %}
+                    </div>
+
+                    <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                        <a href="{% url 'audio_dl:session_list' %}" class="btn btn-outline-secondary me-md-2">
+                            <i class="fas fa-arrow-left me-1"></i>Cancel
+                        </a>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-save me-1"></i>Create Session
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Help Section -->
+        <div class="card mt-4">
+            <div class="card-header">
+                <h6 class="card-title mb-0">
+                    <i class="fas fa-info-circle me-2"></i>About Sessions
+                </h6>
+            </div>
+            <div class="card-body">
+                <p class="card-text">
+                    Download sessions help you organize your audio downloads. Each session can contain multiple downloads,
+                    and you can track the progress of all downloads within a session.
+                </p>
+                <ul class="list-unstyled">
+                    <li><i class="fas fa-check text-success me-2"></i>Organize downloads by project or theme</li>
+                    <li><i class="fas fa-check text-success me-2"></i>Track overall progress across multiple downloads</li>
+                    <li><i class="fas fa-check text-success me-2"></i>Manage downloads in batches</li>
+                    <li><i class="fas fa-check text-success me-2"></i>View detailed statistics and history</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Add form validation styling
+document.addEventListener('DOMContentLoaded', function() {
+    const form = document.querySelector('form');
+    const sessionNameInput = document.querySelector('#{{ form.session_name.id_for_label }}');
+    
+    // Add Bootstrap validation classes
+    if (sessionNameInput.classList.contains('is-invalid')) {
+        sessionNameInput.classList.add('is-invalid');
+    }
+    
+    // Real-time validation
+    sessionNameInput.addEventListener('input', function() {
+        if (this.value.trim().length > 0) {
+            this.classList.remove('is-invalid');
+            this.classList.add('is-valid');
+        } else {
+            this.classList.remove('is-valid');
+            this.classList.add('is-invalid');
+        }
+    });
+    
+    // Form submission validation
+    form.addEventListener('submit', function(e) {
+        if (!sessionNameInput.value.trim()) {
+            e.preventDefault();
+            sessionNameInput.classList.add('is-invalid');
+            sessionNameInput.focus();
+        }
+    });
+});
+</script>
+{% endblock %}

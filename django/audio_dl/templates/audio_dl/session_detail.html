@@ -1,0 +1,332 @@
+{% extends 'audio_dl/base.html' %}
+
+{% block page_title %}{{ session.session_name }}{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <!-- Session Header -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <div class="d-flex justify-content-between align-items-center">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-folder me-2"></i>{{ session.session_name }}
+                    </h5>
+                    <div>
+                        <span class="badge bg-{% if session.status == 'completed' %}success{% elif session.status == 'in_progress' %}warning{% elif session.status == 'failed' %}danger{% else %}secondary{% endif %} fs-6">
+                            {{ session.get_status_display }}
+                        </span>
+                    </div>
+                </div>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-8">
+                        <!-- Progress Bar -->
+                        <div class="mb-3">
+                            <div class="d-flex justify-content-between mb-1">
+                                <span class="fw-bold">Overall Progress</span>
+                                <span class="text-muted">{{ session.progress_percentage|floatformat:1 }}%</span>
+                            </div>
+                            <div class="progress" style="height: 12px;">
+                                <div class="progress-bar progress-bar-striped {% if session.status == 'in_progress' %}progress-bar-animated{% endif %}" 
+                                     role="progressbar" 
+                                     style="width: {{ session.progress_percentage }}%"
+                                     aria-valuenow="{{ session.progress_percentage }}" 
+                                     aria-valuemin="0" aria-valuemax="100">
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Statistics -->
+                        <div class="row text-center">
+                            <div class="col-3">
+                                <div class="border-end">
+                                    <h4 class="text-primary mb-0">{{ session.total_downloads }}</h4>
+                                    <small class="text-muted">Total Downloads</small>
+                                </div>
+                            </div>
+                            <div class="col-3">
+                                <div class="border-end">
+                                    <h4 class="text-success mb-0">{{ session.completed_downloads }}</h4>
+                                    <small class="text-muted">Completed</small>
+                                </div>
+                            </div>
+                            <div class="col-3">
+                                <div class="border-end">
+                                    <h4 class="text-warning mb-0">{{ session.downloads.filter.status='in_progress'|length }}</h4>
+                                    <small class="text-muted">In Progress</small>
+                                </div>
+                            </div>
+                            <div class="col-3">
+                                <h4 class="text-danger mb-0">{{ session.downloads.filter.status='failed'|length }}</h4>
+                                <small class="text-muted">Failed</small>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="text-muted">
+                            <div class="mb-2">
+                                <i class="fas fa-calendar-plus me-2"></i>
+                                <strong>Created:</strong> {{ session.created_at|date:"M d, Y H:i" }}
+                            </div>
+                            <div class="mb-2">
+                                <i class="fas fa-clock me-2"></i>
+                                <strong>Updated:</strong> {{ session.updated_at|date:"M d, Y H:i" }}
+                            </div>
+                            <div>
+                                <i class="fas fa-user me-2"></i>
+                                <strong>Owner:</strong> {{ session.user.username }}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="card-footer">
+                <div class="btn-group" role="group">
+                    <a href="{% url 'audio_dl:add_download' session.id %}" class="btn btn-success">
+                        <i class="fas fa-plus me-1"></i>Add Download
+                    </a>
+                    <a href="{% url 'audio_dl:session_list' %}" class="btn btn-outline-secondary">
+                        <i class="fas fa-arrow-left me-1"></i>Back to Sessions
+                    </a>
+                    <button type="button" class="btn btn-outline-danger" 
+                            onclick="deleteSession('{{ session.id }}', '{{ session.session_name }}')">
+                        <i class="fas fa-trash me-1"></i>Delete Session
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Downloads List -->
+        <div class="card">
+            <div class="card-header">
+                <div class="d-flex justify-content-between align-items-center">
+                    <h6 class="card-title mb-0">
+                        <i class="fas fa-download me-2"></i>Downloads
+                    </h6>
+                    <span class="badge bg-secondary">{{ page_obj.paginator.count }} total</span>
+                </div>
+            </div>
+            <div class="card-body p-0">
+                {% if page_obj %}
+                <div class="table-responsive">
+                    <table class="table table-hover mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Title</th>
+                                <th>Artist</th>
+                                <th>Quality</th>
+                                <th>Status</th>
+                                <th>Size</th>
+                                <th>Created</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for download in page_obj %}
+                            <tr>
+                                <td>
+                                    <div class="d-flex align-items-center">
+                                        <i class="fas fa-music text-muted me-2"></i>
+                                        <div>
+                                            <div class="fw-bold">{{ download.title|default:"Unknown Title" }}</div>
+                                            <small class="text-muted">{{ download.url|truncatechars:50 }}</small>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td>{{ download.artist|default:"Unknown Artist" }}</td>
+                                <td>
+                                    <span class="badge bg-info">{{ download.get_quality_display }}</span>
+                                </td>
+                                <td>
+                                    <span class="badge bg-{% if download.status == 'completed' %}success{% elif download.status == 'downloading' %}warning{% elif download.status == 'failed' %}danger{% elif download.status == 'cancelled' %}secondary{% else %}primary{% endif %}">
+                                        {{ download.get_status_display }}
+                                    </span>
+                                </td>
+                                <td>
+                                    {% if download.file_size %}
+                                        {{ download.file_size|filesizeformat }}
+                                    {% else %}
+                                        <span class="text-muted">-</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <small class="text-muted">{{ download.created_at|timesince }} ago</small>
+                                </td>
+                                <td>
+                                    <div class="btn-group btn-group-sm" role="group">
+                                        {% if download.status == 'pending' %}
+                                        <button type="button" class="btn btn-outline-success" 
+                                                onclick="startDownload('{{ download.id }}')">
+                                            <i class="fas fa-play"></i>
+                                        </button>
+                                        {% elif download.status == 'downloading' %}
+                                        <button type="button" class="btn btn-outline-danger" 
+                                                onclick="cancelDownload('{{ download.id }}')">
+                                            <i class="fas fa-stop"></i>
+                                        </button>
+                                        {% endif %}
+                                        
+                                        {% if download.status == 'completed' and download.file_path %}
+                                        <a href="{{ download.file_path }}" class="btn btn-outline-primary" 
+                                           target="_blank" title="Download File">
+                                            <i class="fas fa-download"></i>
+                                        </a>
+                                        {% endif %}
+                                        
+                                        <button type="button" class="btn btn-outline-danger" 
+                                                onclick="deleteDownload('{{ download.id }}', '{{ download.title|default:"Unknown" }}')">
+                                            <i class="fas fa-trash"></i>
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <div class="text-center py-5">
+                    <i class="fas fa-download fa-3x text-muted mb-3"></i>
+                    <h5 class="text-muted">No Downloads Yet</h5>
+                    <p class="text-muted">Add your first audio download to get started.</p>
+                    <a href="{% url 'audio_dl:add_download' session.id %}" class="btn btn-primary">
+                        <i class="fas fa-plus me-2"></i>Add First Download
+                    </a>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Pagination -->
+        {% if page_obj.has_other_pages %}
+        <nav aria-label="Downloads pagination" class="mt-3">
+            <ul class="pagination justify-content-center">
+                {% if page_obj.has_previous %}
+                <li class="page-item">
+                    <a class="page-link" href="?page=1">First</a>
+                </li>
+                <li class="page-item">
+                    <a class="page-link" href="?page={{ page_obj.previous_page_number }}">Previous</a>
+                </li>
+                {% endif %}
+
+                <li class="page-item active">
+                    <span class="page-link">
+                        Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}
+                    </span>
+                </li>
+
+                {% if page_obj.has_next %}
+                <li class="page-item">
+                    <a class="page-link" href="?page={{ page_obj.next_page_number }}">Next</a>
+                </li>
+                <li class="page-item">
+                    <a class="page-link" href="?page={{ page_obj.paginator.num_pages }}">Last</a>
+                </li>
+                {% endif %}
+            </ul>
+        </nav>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function startDownload(downloadId) {
+    fetch(`/downloads/${downloadId}/start/`, {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
+            'Content-Type': 'application/json',
+        },
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            location.reload();
+        } else {
+            alert('Error starting download: ' + data.error);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('An error occurred while starting the download.');
+    });
+}
+
+function cancelDownload(downloadId) {
+    if (confirm('Are you sure you want to cancel this download?')) {
+        fetch(`/downloads/${downloadId}/cancel/`, {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
+                'Content-Type': 'application/json',
+            },
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                location.reload();
+            } else {
+                alert('Error cancelling download: ' + data.error);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('An error occurred while cancelling the download.');
+        });
+    }
+}
+
+function deleteDownload(downloadId, downloadTitle) {
+    if (confirm(`Are you sure you want to delete "${downloadTitle}"?`)) {
+        fetch(`/downloads/${downloadId}/delete/`, {
+            method: 'DELETE',
+            headers: {
+                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
+                'Content-Type': 'application/json',
+            },
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                location.reload();
+            } else {
+                alert('Error deleting download: ' + data.message);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('An error occurred while deleting the download.');
+        });
+    }
+}
+
+function deleteSession(sessionId, sessionName) {
+    if (confirm(`Are you sure you want to delete the session "${sessionName}"? This action cannot be undone.`)) {
+        fetch(`/sessions/${sessionId}/delete/`, {
+            method: 'DELETE',
+            headers: {
+                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
+                'Content-Type': 'application/json',
+            },
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                window.location.href = '{% url "audio_dl:session_list" %}';
+            } else {
+                alert('Error deleting session: ' + data.message);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('An error occurred while deleting the session.');
+        });
+    }
+}
+</script>
+{% endblock %}

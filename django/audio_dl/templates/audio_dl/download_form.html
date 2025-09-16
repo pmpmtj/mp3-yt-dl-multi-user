@@ -1,0 +1,201 @@
+{% extends 'audio_dl/base.html' %}
+
+{% block page_title %}Add Download to {{ session.session_name }}{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-8 col-lg-6">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-plus me-2"></i>Add New Download
+                </h5>
+                <small class="text-muted">Session: {{ session.session_name }}</small>
+            </div>
+            <div class="card-body">
+                <form method="post">
+                    {% csrf_token %}
+                    
+                    <div class="mb-3">
+                        <label for="{{ form.url.id_for_label }}" class="form-label">
+                            {{ form.url.label }} <span class="text-danger">*</span>
+                        </label>
+                        {{ form.url }}
+                        {% if form.url.help_text %}
+                        <div class="form-text">{{ form.url.help_text }}</div>
+                        {% endif %}
+                        {% if form.url.errors %}
+                        <div class="invalid-feedback d-block">
+                            {% for error in form.url.errors %}
+                                {{ error }}
+                            {% endfor %}
+                        </div>
+                        {% endif %}
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="{{ form.title.id_for_label }}" class="form-label">
+                                    {{ form.title.label }}
+                                </label>
+                                {{ form.title }}
+                                {% if form.title.help_text %}
+                                <div class="form-text">{{ form.title.help_text }}</div>
+                                {% endif %}
+                                {% if form.title.errors %}
+                                <div class="invalid-feedback d-block">
+                                    {% for error in form.title.errors %}
+                                        {{ error }}
+                                    {% endfor %}
+                                </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="{{ form.artist.id_for_label }}" class="form-label">
+                                    {{ form.artist.label }}
+                                </label>
+                                {{ form.artist }}
+                                {% if form.artist.help_text %}
+                                <div class="form-text">{{ form.artist.help_text }}</div>
+                                {% endif %}
+                                {% if form.artist.errors %}
+                                <div class="invalid-feedback d-block">
+                                    {% for error in form.artist.errors %}
+                                        {{ error }}
+                                    {% endfor %}
+                                </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="{{ form.quality.id_for_label }}" class="form-label">
+                            {{ form.quality.label }}
+                        </label>
+                        {{ form.quality }}
+                        {% if form.quality.help_text %}
+                        <div class="form-text">{{ form.quality.help_text }}</div>
+                        {% endif %}
+                        {% if form.quality.errors %}
+                        <div class="invalid-feedback d-block">
+                            {% for error in form.quality.errors %}
+                                {{ error }}
+                            {% endfor %}
+                        </div>
+                        {% endif %}
+                    </div>
+
+                    <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                        <a href="{% url 'audio_dl:session_detail' session.id %}" class="btn btn-outline-secondary me-md-2">
+                            <i class="fas fa-arrow-left me-1"></i>Back to Session
+                        </a>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-plus me-1"></i>Add Download
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Help Section -->
+        <div class="card mt-4">
+            <div class="card-header">
+                <h6 class="card-title mb-0">
+                    <i class="fas fa-info-circle me-2"></i>Adding Downloads
+                </h6>
+            </div>
+            <div class="card-body">
+                <p class="card-text">
+                    You can add audio downloads by providing the URL. The system will automatically detect
+                    the title and artist information if not provided.
+                </p>
+                <div class="row">
+                    <div class="col-md-6">
+                        <h6>Supported Sources:</h6>
+                        <ul class="list-unstyled">
+                            <li><i class="fas fa-check text-success me-2"></i>YouTube</li>
+                            <li><i class="fas fa-check text-success me-2"></i>SoundCloud</li>
+                            <li><i class="fas fa-check text-success me-2"></i>Direct MP3/MP4 URLs</li>
+                            <li><i class="fas fa-check text-success me-2"></i>And more...</li>
+                        </ul>
+                    </div>
+                    <div class="col-md-6">
+                        <h6>Quality Options:</h6>
+                        <ul class="list-unstyled">
+                            <li><i class="fas fa-music text-primary me-2"></i>Best Quality</li>
+                            <li><i class="fas fa-music text-primary me-2"></i>320 kbps</li>
+                            <li><i class="fas fa-music text-primary me-2"></i>192 kbps</li>
+                            <li><i class="fas fa-music text-primary me-2"></i>128 kbps</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Add form validation styling
+document.addEventListener('DOMContentLoaded', function() {
+    const form = document.querySelector('form');
+    const urlInput = document.querySelector('#{{ form.url.id_for_label }}');
+    const titleInput = document.querySelector('#{{ form.title.id_for_label }}');
+    const artistInput = document.querySelector('#{{ form.artist.id_for_label }}');
+    
+    // Add Bootstrap validation classes
+    [urlInput, titleInput, artistInput].forEach(input => {
+        if (input.classList.contains('is-invalid')) {
+            input.classList.add('is-invalid');
+        }
+    });
+    
+    // URL validation
+    urlInput.addEventListener('input', function() {
+        const urlPattern = /^https?:\/\/.+/;
+        if (this.value.trim() && urlPattern.test(this.value)) {
+            this.classList.remove('is-invalid');
+            this.classList.add('is-valid');
+        } else if (this.value.trim()) {
+            this.classList.remove('is-valid');
+            this.classList.add('is-invalid');
+        } else {
+            this.classList.remove('is-valid', 'is-invalid');
+        }
+    });
+    
+    // Form submission validation
+    form.addEventListener('submit', function(e) {
+        let isValid = true;
+        
+        if (!urlInput.value.trim()) {
+            urlInput.classList.add('is-invalid');
+            isValid = false;
+        }
+        
+        if (!isValid) {
+            e.preventDefault();
+            urlInput.focus();
+        }
+    });
+    
+    // Auto-detect title and artist from URL (placeholder functionality)
+    urlInput.addEventListener('blur', function() {
+        if (this.value.trim() && !titleInput.value.trim()) {
+            // This would typically make an AJAX call to detect metadata
+            // For now, we'll just show a placeholder
+            if (this.value.includes('youtube.com') || this.value.includes('youtu.be')) {
+                titleInput.placeholder = 'YouTube video detected - title will be auto-detected';
+            } else if (this.value.includes('soundcloud.com')) {
+                titleInput.placeholder = 'SoundCloud track detected - title will be auto-detected';
+            }
+        }
+    });
+});
+</script>
+{% endblock %}

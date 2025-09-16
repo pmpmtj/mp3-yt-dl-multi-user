@@ -12,9 +12,17 @@ https://docs.djangoproject.com/en/4.2/ref/settings/
 
 from pathlib import Path
 import os
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
+
+# Add the parent directory to Python path for audio_dl app
+import sys
+sys.path.insert(0, str(BASE_DIR.parent))
 
 
 # Quick-start development settings - unsuitable for production
@@ -75,12 +83,29 @@ WSGI_APPLICATION = 'my_downloader.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/4.2/ref/settings/#databases
 
+# Database configuration - using SQLite for development
+# Switch to PostgreSQL in production by uncommenting the PostgreSQL config below
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.sqlite3',
         'NAME': BASE_DIR / 'db.sqlite3',
     }
 }
+
+# PostgreSQL configuration (uncomment for production)
+# DATABASES = {
+#     'default': {
+#         'ENGINE': 'django.db.backends.postgresql',
+#         'NAME': os.getenv('DATABASE_NAME', 'audio_downloader'),
+#         'USER': os.getenv('DATABASE_USER', 'postgres'),
+#         'PASSWORD': os.getenv('DATABASE_PASSWORD', ''),
+#         'HOST': os.getenv('DATABASE_HOST', 'localhost'),
+#         'PORT': os.getenv('DATABASE_PORT', '5432'),
+#         'OPTIONS': {
+#             'connect_timeout': 10,
+#         }
+#     }
+# }
 
 
 # Password validation

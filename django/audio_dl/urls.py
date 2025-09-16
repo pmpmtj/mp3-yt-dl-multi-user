@@ -26,4 +26,7 @@ urlpatterns = [
     path('downloads/<uuid:download_id>/cancel/', views.cancel_download, name='cancel_download'),
     path('downloads/<uuid:download_id>/status/', views.download_status, name='download_status'),
     path('downloads/<uuid:download_id>/delete/', views.delete_download, name='delete_download'),
+    
+    # Auto-download API for external applications
+    path('api/auto-download/', views.auto_download, name='auto_download'),
 ]

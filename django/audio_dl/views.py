@@ -410,3 +410,157 @@ def delete_download(request, download_id):
         'success': True,
         'message': f'Download "{download_title}" deleted successfully'
     })
+
+
+@csrf_exempt
+@require_http_methods(["POST"])
+def auto_download(request):
+    """
+    Automatic download endpoint for external applications.
+    
+    This endpoint allows external applications to download audio files
+    by simply providing a YouTube URL. No authentication required.
+    
+    Request Body:
+        {
+            "url": "https://youtube.com/watch?v=...",
+            "quality": "best" (optional, default: "best"),
+            "format": "mp3" (optional, default: "mp3")
+        }
+    
+    Response:
+        {
+            "success": true,
+            "file_path": "/media/downloads/session_uuid/job_uuid/filename.mp3",
+            "download_url": "http://localhost:8000/media/downloads/session_uuid/job_uuid/filename.mp3",
+            "title": "Video Title",
+            "artist": "Channel Name",
+            "file_size": 4946683,
+            "duration": "00:03:26"
+        }
+    """
+    try:
+        # Parse request data
+        data = json.loads(request.body)
+        url = data.get('url')
+        quality = data.get('quality', 'best')
+        format_type = data.get('format', 'mp3')
+        
+        if not url:
+            return JsonResponse({
+                'success': False,
+                'error': 'URL is required'
+            }, status=400)
+        
+        # Validate URL format
+        if 'youtube.com' not in url and 'youtu.be' not in url:
+            return JsonResponse({
+                'success': False,
+                'error': 'Only YouTube URLs are supported'
+            }, status=400)
+        
+        logger.info(f"Auto-download request for URL: {url}")
+        
+        # Import audio downloader components
+        try:
+            current_dir = Path(__file__).resolve().parent
+            project_root = current_dir.parent.parent
+            src_path = project_root / 'src'
+            if str(src_path) not in sys.path:
+                sys.path.insert(0, str(src_path))
+            if str(project_root) not in sys.path:
+                sys.path.insert(0, str(project_root))
+                
+            from yt_audio_dl.audio_core import AudioDownloader, AudioDownloadError, DownloadStatus  # type: ignore
+            from common.logging_config import setup_logging  # type: ignore
+            from common.user_context import create_user_context  # type: ignore
+            from common.session_manager import get_session_manager  # type: ignore
+            
+            setup_logging()
+        except ImportError as e:
+            logger.error(f"Failed to import audio downloader components: {e}")
+            return JsonResponse({
+                'success': False,
+                'error': 'Audio downloader not available'
+            }, status=500)
+        
+        # Create temporary session for external request
+        session_manager = get_session_manager()
+        session_uuid = session_manager.create_session()
+        user_context = create_user_context(session_uuid)
+        
+        # Get job UUID for this URL
+        job_uuid = user_context.get_url_uuid(url)
+        
+        # Set up download directory using same structure as other downloads
+        download_dir = Path(settings.MEDIA_ROOT) / 'downloads' / session_uuid / job_uuid
+        download_dir.mkdir(parents=True, exist_ok=True)
+        
+        # Create audio downloader instance
+        downloader = AudioDownloader(
+            output_dir=download_dir
+        )
+        
+        # Get video info first
+        try:
+            video_info = downloader.get_video_info(url)
+            title = video_info.get('title', 'Unknown Title')
+            artist = video_info.get('uploader', 'Unknown Artist')
+            duration = video_info.get('duration', 0)
+        except Exception as e:
+            logger.warning(f"Could not get video info: {e}")
+            title = 'Unknown Title'
+            artist = 'Unknown Artist'
+            duration = 0
+        
+        # Start the download
+        result = downloader.download_audio(url)
+        
+        if result.success and result.output_path:
+            # Convert duration to readable format
+            duration_str = f"{int(duration // 60):02d}:{int(duration % 60):02d}" if duration > 0 else "00:00"
+            
+            # Create relative path for web access
+            relative_path = result.output_path.relative_to(settings.MEDIA_ROOT)
+            file_path = f"/media/{relative_path.as_posix()}"
+            download_url = f"{request.build_absolute_uri('/')[:-1]}{file_path}"
+            
+            logger.info(f"Auto-download completed successfully: {result.output_path}")
+            
+            return JsonResponse({
+                'success': True,
+                'file_path': file_path,
+                'download_url': download_url,
+                'title': title,
+                'artist': artist,
+                'file_size': result.file_size_bytes,
+                'duration': duration_str,
+                'quality': quality,
+                'format': format_type,
+                'session_id': session_uuid,
+                'job_id': job_uuid
+            })
+        else:
+            logger.error(f"Auto-download failed: {result.error_message}")
+            return JsonResponse({
+                'success': False,
+                'error': result.error_message or 'Download failed'
+            }, status=500)
+            
+    except json.JSONDecodeError:
+        return JsonResponse({
+            'success': False,
+            'error': 'Invalid JSON in request body'
+        }, status=400)
+    except AudioDownloadError as e:
+        logger.error(f"Audio download error: {str(e)}")
+        return JsonResponse({
+            'success': False,
+            'error': str(e)
+        }, status=500)
+    except Exception as e:
+        logger.error(f"Unexpected error in auto-download: {str(e)}")
+        return JsonResponse({
+            'success': False,
+            'error': f'Unexpected error: {str(e)}'
+        }, status=500)

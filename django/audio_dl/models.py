@@ -95,11 +95,24 @@ class AudioDownload(models.Model):
         self.update_session_counters()
     
     def update_session_counters(self):
-        """Update the parent session's download counters."""
+        """Update the parent session's download counters and status."""
         session = self.session
         session.total_downloads = session.downloads.count()
         session.completed_downloads = session.downloads.filter(status='completed').count()
-        session.save(update_fields=['total_downloads', 'completed_downloads'])
+        
+        # Update session status based on download progress
+        if session.total_downloads == 0:
+            session.status = 'pending'
+        elif session.completed_downloads == session.total_downloads:
+            session.status = 'completed'
+        elif session.downloads.filter(status__in=['downloading', 'pending']).exists():
+            session.status = 'in_progress'
+        elif session.downloads.filter(status='failed').exists():
+            # If there are failed downloads but no active ones
+            if not session.downloads.filter(status__in=['downloading', 'pending']).exists():
+                session.status = 'failed'
+        
+        session.save(update_fields=['total_downloads', 'completed_downloads', 'status'])
 
 
 class DownloadHistory(models.Model):

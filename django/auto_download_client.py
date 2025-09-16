@@ -20,15 +20,20 @@ class AutoDownloadClient:
     using the Django-based auto-download service.
     """
     
-    def __init__(self, base_url: str = "http://localhost:8000"):
+    def __init__(self, base_url: str = "http://localhost:8000", username: str = None, password: str = None):
         """
         Initialize the Auto-Download client.
         
         Args:
             base_url: Base URL of the Django server (default: http://localhost:8000)
+            username: Django username for linking sessions (optional)
+            password: Not used in current implementation (optional)
         """
         self.base_url = base_url.rstrip('/')
         self.api_endpoint = f"{self.base_url}/api/auto-download/"
+        self.username = username
+        self.session = requests.Session()
+    
     
     def download(self, 
                 url: str, 
@@ -57,8 +62,12 @@ class AutoDownloadClient:
             "format": format_type
         }
         
+        # Add username if provided for session linking
+        if self.username:
+            payload["username"] = self.username
+        
         try:
-            response = requests.post(
+            response = self.session.post(
                 self.api_endpoint,
                 json=payload,
                 timeout=300  # 5 minute timeout
@@ -115,7 +124,7 @@ class AutoDownloadClient:
             output_path.mkdir(parents=True, exist_ok=True)
             
             # Download the file from the provided URL
-            file_response = requests.get(result["download_url"])
+            file_response = self.session.get(result["download_url"])
             file_response.raise_for_status()
             
             # Generate local filename with proper sanitization
@@ -185,10 +194,15 @@ def main():
     parser.add_argument("--format", default="mp3", help="Audio format")
     parser.add_argument("--save", help="Save to local directory")
     parser.add_argument("--server", default="http://localhost:8000", help="Server URL")
+    parser.add_argument("--username", help="Django username for linking sessions")
+    parser.add_argument("--password", help="Not used (kept for compatibility)")
     
     args = parser.parse_args()
     
-    client = AutoDownloadClient(args.server)
+    client = AutoDownloadClient(
+        base_url=args.server,
+        username=args.username
+    )
     
     if args.save:
         result = client.download_and_save(

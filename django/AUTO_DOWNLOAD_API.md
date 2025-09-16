@@ -22,7 +22,8 @@ Content-Type: application/json
 {
     "url": "https://youtube.com/watch?v=VIDEO_ID",
     "quality": "best",     // Optional: "best", "worst", "128k", "192k", "320k"
-    "format": "mp3"        // Optional: "mp3", "wav", "flac"
+    "format": "mp3",       // Optional: "mp3", "wav", "flac"
+    "username": "pmpmt"  // Optional: Django username for session linking
 }
 ```
 
@@ -32,6 +33,7 @@ Content-Type: application/json
 ### Optional Fields
 - `quality`: Audio quality (default: "best")
 - `format`: Audio format (default: "mp3")
+- `username`: Django username to link the session to (default: null - unlinked session)
 
 ## Response
 
@@ -50,7 +52,8 @@ Content-Type: application/json
     "session_id": "session-uuid",
     "job_id": "job-uuid",
     "database_session_id": "database-session-uuid",
-    "database_download_id": "database-download-uuid"
+    "database_download_id": "database-download-uuid",
+    "linked_to_user": "username"  // Present if username was provided and found
 }
 ```
 
@@ -114,6 +117,7 @@ downloadAudio('https://youtube.com/watch?v=XNNjYas8Xo8');
 
 ### cURL
 ```bash
+# Basic usage (unlinked session)
 curl -X POST http://localhost:8000/audio_dl/api/auto-download/ \
   -H "Content-Type: application/json" \
   -d '{
@@ -121,14 +125,33 @@ curl -X POST http://localhost:8000/audio_dl/api/auto-download/ \
     "quality": "best",
     "format": "mp3"
   }'
+
+# With username (linked session)
+curl -X POST http://localhost:8000/audio_dl/api/auto-download/ \
+  -H "Content-Type: application/json" \
+  -d '{
+    "url": "https://youtube.com/watch?v=XNNjYas8Xo8",
+    "quality": "best",
+    "format": "mp3",
+    "username": "your_username"
+  }'
 ```
 
 ### PowerShell
 ```powershell
+# Basic usage (unlinked session)
 $body = @{
     url = "https://youtube.com/watch?v=XNNjYas8Xo8"
     quality = "best"
     format = "mp3"
+} | ConvertTo-Json
+
+# With username (linked session)
+$body = @{
+    url = "https://youtube.com/watch?v=XNNjYas8Xo8"
+    quality = "best"
+    format = "mp3"
+    username = "your_username"
 } | ConvertTo-Json
 
 $response = Invoke-RestMethod -Uri "http://localhost:8000/audio_dl/api/auto-download/" -Method POST -Body $body -ContentType "application/json"
@@ -177,6 +200,25 @@ Currently no rate limiting is implemented. For production use, consider implemen
 - Concurrent download limits
 - API key authentication
 
+## Python Client Library
+
+A Python client library is provided for easy integration:
+
+```python
+from auto_download_client import AutoDownloadClient
+
+# Basic usage (unlinked session)
+client = AutoDownloadClient()
+result = client.download("https://youtube.com/watch?v=XNNjYas8Xo8")
+
+# With username (linked session)
+client = AutoDownloadClient(username="your_username")
+result = client.download("https://youtube.com/watch?v=XNNjYas8Xo8")
+
+# Command line usage
+# python auto_download_client.py "https://youtu.be/VIDEO_ID" --username your_username
+```
+
 ## Database Integration
 
 The auto-download API automatically creates database entries for tracking:
@@ -185,17 +227,25 @@ The auto-download API automatically creates database entries for tracking:
 - **AudioDownload**: Created for each individual download
 - **DownloadHistory**: Created upon successful completion
 
+**Session Linking:**
+- Sessions with `username` parameter are linked to the specified Django user
+- Sessions without `username` remain unlinked (`user=null`)
+- Linked sessions appear in the Django web interface when logged in
+- Unlinked sessions can be linked later using the management command
+
 **Database Fields Populated:**
 - Session name, status, timestamps
 - Download title, artist, duration, file size
 - File path, quality, format
 - Error messages (if failed)
 - Completion timestamps
+- User association (if username provided)
 
 **Accessing Downloads:**
 - View in Django admin: `/admin/audio_dl/`
 - Query via Django ORM
-- Track via web interface (if user is logged in)
+- Track via web interface (if user is logged in and session is linked)
+- Link existing sessions: `python manage.py link_sessions_to_user --username your_username --hours 24`
 
 ## Security Notes
 

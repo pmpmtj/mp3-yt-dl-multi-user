@@ -412,6 +412,82 @@ def delete_download(request, download_id):
     })
 
 
+@login_required
+@require_http_methods(["POST"])
+def link_session_to_user(request, session_id):
+    """Link an existing session (created via API) to the current user."""
+    try:
+        session = DownloadSession.objects.get(id=session_id)
+        
+        # Only allow linking sessions that don't already have a user
+        if session.user is not None:
+            return JsonResponse({
+                'success': False,
+                'error': 'Session is already linked to a user'
+            }, status=400)
+        
+        # Link the session to the current user
+        session.user = request.user
+        session.save()
+        
+        return JsonResponse({
+            'success': True,
+            'message': f'Session "{session.session_name}" linked to your account',
+            'session_id': str(session.id)
+        })
+        
+    except DownloadSession.DoesNotExist:
+        return JsonResponse({
+            'success': False,
+            'error': 'Session not found'
+        }, status=404)
+    except Exception as e:
+        logger.error(f"Error linking session to user: {e}")
+        return JsonResponse({
+            'success': False,
+            'error': 'Failed to link session'
+        }, status=500)
+
+
+@login_required
+def unlinked_sessions(request):
+    """Get sessions that were created via API but not linked to any user."""
+    # Find sessions created in the last 24 hours that don't have a user
+    from datetime import timedelta
+    cutoff_time = timezone.now() - timedelta(hours=24)
+    
+    unlinked_sessions = DownloadSession.objects.filter(
+        user__isnull=True,
+        created_at__gte=cutoff_time
+    ).order_by('-created_at')[:10]  # Limit to 10 most recent
+    
+    sessions_data = []
+    for session in unlinked_sessions:
+        sessions_data.append({
+            'id': str(session.id),
+            'session_name': session.session_name,
+            'status': session.status,
+            'total_downloads': session.total_downloads,
+            'completed_downloads': session.completed_downloads,
+            'created_at': session.created_at.isoformat(),
+            'downloads': [
+                {
+                    'id': str(download.id),
+                    'title': download.title,
+                    'artist': download.artist,
+                    'status': download.status,
+                    'url': download.url
+                }
+                for download in session.downloads.all()[:5]  # Limit to 5 downloads
+            ]
+        })
+    
+    return JsonResponse({
+        'success': True,
+        'sessions': sessions_data
+    })
+
+
 @csrf_exempt
 @require_http_methods(["POST"])
 def auto_download(request):
@@ -419,7 +495,8 @@ def auto_download(request):
     Automatic download endpoint for external applications.
     
     This endpoint allows external applications to download audio files
-    by simply providing a YouTube URL. No authentication required.
+    by providing a YouTube URL. Authentication is optional - if authenticated,
+    the session will be linked to the user.
     
     Request Body:
         {
@@ -445,6 +522,7 @@ def auto_download(request):
         url = data.get('url')
         quality = data.get('quality', 'best')
         format_type = data.get('format', 'mp3')
+        username = data.get('username')  # Optional username for linking
         
         if not url:
             return JsonResponse({
@@ -499,9 +577,21 @@ def auto_download(request):
         
         # Create database entries for tracking
         # Create a temporary download session in the database
+        # Link to user if authenticated or username provided
+        user_to_link = None
+        if request.user.is_authenticated:
+            user_to_link = request.user
+        elif username:
+            try:
+                from django.contrib.auth.models import User
+                user_to_link = User.objects.get(username=username)
+            except User.DoesNotExist:
+                logger.warning(f"Username '{username}' not found for session linking")
+        
         download_session = DownloadSession.objects.create(
             session_name=f"Auto-Download Session {session_uuid[:8]}",
-            status='in_progress'
+            status='in_progress',
+            user=user_to_link
         )
         
         # Create the download record

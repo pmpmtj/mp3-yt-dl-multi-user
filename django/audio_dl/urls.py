@@ -29,4 +29,8 @@ urlpatterns = [
     
     # Auto-download API for external applications
     path('api/auto-download/', views.auto_download, name='auto_download'),
+    
+    # Session linking for API-created sessions
+    path('sessions/<uuid:session_id>/link/', views.link_session_to_user, name='link_session_to_user'),
+    path('api/unlinked-sessions/', views.unlinked_sessions, name='unlinked_sessions'),
 ]

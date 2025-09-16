@@ -85,27 +85,52 @@ WSGI_APPLICATION = 'my_downloader.wsgi.application'
 
 # Database configuration - using SQLite for development
 # Switch to PostgreSQL in production by uncommenting the PostgreSQL config below
-#DATABASES = {
-#    'default': {
-#        'ENGINE': 'django.db.backends.sqlite3',
-#        'NAME': BASE_DIR / 'db.sqlite3',
-#    }
-#}
 
 # PostgreSQL configuration (uncomment for production)
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.postgresql',
-        'NAME': os.getenv('DATABASE_NAME', 'audio_downloader'),
-        'USER': os.getenv('DATABASE_USER', 'postgres'),
-        'PASSWORD': os.getenv('DATABASE_PASSWORD', ''),
-        'HOST': os.getenv('DATABASE_HOST', 'localhost'),
-        'PORT': os.getenv('DATABASE_PORT', '5432'),
-        'OPTIONS': {
-            'connect_timeout': 10,
+# Parse DATABASE_URL from .env file
+DATABASE_URL = os.getenv('DATABASE_URL')
+if DATABASE_URL:
+    # Parse postgresql+psycopg://user:password@host:port/database
+    import re
+    match = re.match(r'postgresql\+psycopg://([^:]+):([^@]+)@([^:]+):(\d+)/(.+)', DATABASE_URL)
+    if match:
+        user, password, host, port, database = match.groups()
+        DATABASES = {
+            'default': {
+                'ENGINE': 'django.db.backends.postgresql',
+                'NAME': database,
+                'USER': user,
+                'PASSWORD': password,
+                'HOST': host,
+                'PORT': port,
+                'OPTIONS': {
+                    'connect_timeout': 10,
+                }
+            }
+        }
+    else:
+        # Fallback to individual environment variables
+        DATABASES = {
+            'default': {
+                'ENGINE': 'django.db.backends.postgresql',
+                'NAME': os.getenv('DATABASE_NAME', 'audio_downloader'),
+                'USER': os.getenv('DATABASE_USER', 'postgres'),
+                'PASSWORD': os.getenv('DATABASE_PASSWORD', ''),
+                'HOST': os.getenv('DATABASE_HOST', 'localhost'),
+                'PORT': os.getenv('DATABASE_PORT', '5432'),
+                'OPTIONS': {
+                    'connect_timeout': 10,
+                }
+            }
+        }
+else:
+    # Fallback to SQLite if no DATABASE_URL
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.sqlite3',
+            'NAME': BASE_DIR / 'db.sqlite3',
         }
     }
-}
 
 
 # Password validation

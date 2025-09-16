@@ -43,12 +43,13 @@ class DownloadSessionAdmin(admin.ModelAdmin):
         """Display progress as a progress bar."""
         percentage = obj.progress_percentage
         color = 'green' if percentage == 100 else 'orange' if percentage > 0 else 'gray'
+        percentage_str = f"{percentage:.1f}%"
         return format_html(
             '<div style="width: 100px; background-color: #f0f0f0; border-radius: 3px;">'
             '<div style="width: {}%; background-color: {}; height: 20px; border-radius: 3px; '
             'display: flex; align-items: center; justify-content: center; color: white; '
-            'font-size: 12px; font-weight: bold;">{:.1f}%</div></div>',
-            percentage, color, percentage
+            'font-size: 12px; font-weight: bold;">{}</div></div>',
+            percentage, color, percentage_str
         )
     progress_display.short_description = 'Progress'
     

@@ -219,6 +219,50 @@ LOGGING_CONFIG = {
             'propagate': False,
         },
         
+        # Database testing
+        'db_test': {
+            'handlers': ['console', 'app_file', 'error_file'],
+            'level': 'DEBUG',
+            'propagate': False,
+        },
+        
+        # Database package
+        'db_config': {
+            'handlers': ['console', 'app_file'],
+            'level': 'DEBUG',
+            'propagate': False,
+        },
+        'db_connection': {
+            'handlers': ['console', 'app_file', 'error_file'],
+            'level': 'DEBUG',
+            'propagate': False,
+        },
+        'db_model_users': {
+            'handlers': ['app_file'],
+            'level': 'DEBUG',
+            'propagate': False,
+        },
+        'db_model_sessions': {
+            'handlers': ['app_file'],
+            'level': 'DEBUG',
+            'propagate': False,
+        },
+        'db_utils': {
+            'handlers': ['console', 'app_file', 'error_file'],
+            'level': 'DEBUG',
+            'propagate': False,
+        },
+        'db_migration': {
+            'handlers': ['console', 'app_file', 'error_file'],
+            'level': 'DEBUG',
+            'propagate': False,
+        },
+        'db_ops_test': {
+            'handlers': ['console', 'app_file', 'error_file'],
+            'level': 'DEBUG',
+            'propagate': False,
+        },
+        
         # Third-party libraries (reduce noise)
         'yt_dlp': {
             'handlers': ['core_file'],

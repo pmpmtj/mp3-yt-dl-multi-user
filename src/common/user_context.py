@@ -45,14 +45,14 @@ class UserContext:
         logger.info(f"Initialized user context with session: {self.session_uuid}")
     
     def _default_path_generator(self, session_uuid: str, job_uuid: str, 
-                               media_type: str, base_dir: Optional[Union[str, Path]] = None) -> Path:
+                               media_type: Optional[str], base_dir: Optional[Union[str, Path]] = None) -> Path:
         """
         Default path generator using simple directory structure.
         
         Args:
             session_uuid: Session identifier
             job_uuid: Job identifier
-            media_type: Media type (audio, video, transcripts)
+            media_type: Media type (audio, video, transcripts) or None for audio downloads
             base_dir: Base directory for downloads
             
         Returns:
@@ -61,7 +61,11 @@ class UserContext:
         if base_dir is None:
             base_dir = self._base_download_dir or "./downloads"
         
-        return Path(base_dir) / session_uuid / job_uuid / media_type
+        if media_type is None:
+            # For audio downloads, don't add media_type subdirectory
+            return Path(base_dir) / session_uuid / job_uuid
+        else:
+            return Path(base_dir) / session_uuid / job_uuid / media_type
     
     def get_session_id(self) -> str:
         """
@@ -103,7 +107,7 @@ class UserContext:
             Path to the audio download directory
         """
         job_uuid = self.get_url_uuid(job_url)
-        return self._path_generator(self.session_uuid, job_uuid, "audio", base_dir)
+        return self._path_generator(self.session_uuid, job_uuid, None, base_dir)
     
     def get_video_download_path(self, job_url: str, base_dir: Optional[Union[str, Path]] = None) -> Path:
         """

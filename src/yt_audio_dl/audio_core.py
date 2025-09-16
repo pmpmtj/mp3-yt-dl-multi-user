@@ -476,7 +476,7 @@ class AudioDownloader:
             logger.info(f"Starting session-based audio download: session={session_uuid}, job={job_uuid}")
             
             # Create session-specific output directory
-            session_output_dir = self.output_dir / session_uuid / job_uuid / "audio"
+            session_output_dir = self.output_dir / session_uuid / job_uuid
             session_output_dir.mkdir(parents=True, exist_ok=True)
             
             # Create a temporary downloader with session-specific output

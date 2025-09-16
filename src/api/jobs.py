@@ -325,7 +325,7 @@ def get_download_paths(user_context, job_data) -> dict:
     job_url = job_data["job_url"]
     
     return {
-        "base": user_context.get_audio_download_path(job_url).parent,
+        "base": user_context.get_audio_download_path(job_url),
         "audio": user_context.get_audio_download_path(job_url),
         "video": user_context.get_video_download_path(job_url),
         "transcript": user_context.get_transcript_download_path(job_url)

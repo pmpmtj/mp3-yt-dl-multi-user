@@ -12,10 +12,18 @@ __description__ = "Multiuser YouTube Downloader with Session Management"
 # Main modules
 from . import common
 from . import yt_audio_dl
-from . import api
 
-__all__ = [
-    'common',
-    'yt_audio_dl', 
-    'api'
-]
+# Conditionally import API module to avoid FastAPI dependency in Django
+try:
+    from . import api
+    __all__ = [
+        'common',
+        'yt_audio_dl', 
+        'api'
+    ]
+except ImportError:
+    # API module not available (e.g., in Django context)
+    __all__ = [
+        'common',
+        'yt_audio_dl'
+    ]

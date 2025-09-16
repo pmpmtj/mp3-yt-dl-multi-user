@@ -3,6 +3,9 @@
 {% block page_title %}{{ session.session_name }}{% endblock %}
 
 {% block content %}
+<!-- CSRF Token for AJAX requests -->
+{% csrf_token %}
+
 <div class="row">
     <div class="col-12">
         <!-- Session Header -->
@@ -54,12 +57,12 @@
                             </div>
                             <div class="col-3">
                                 <div class="border-end">
-                                    <h4 class="text-warning mb-0">{{ session.downloads.filter.status='in_progress'|length }}</h4>
+                                    <h4 class="text-warning mb-0">{{ in_progress_count }}</h4>
                                     <small class="text-muted">In Progress</small>
                                 </div>
                             </div>
                             <div class="col-3">
-                                <h4 class="text-danger mb-0">{{ session.downloads.filter.status='failed'|length }}</h4>
+                                <h4 class="text-danger mb-0">{{ failed_count }}</h4>
                                 <small class="text-muted">Failed</small>
                             </div>
                         </div>
@@ -236,24 +239,49 @@
 {% block extra_js %}
 <script>
 function startDownload(downloadId) {
+    console.log('Starting download for ID:', downloadId);
+    
+    // Debug: Check all input elements
+    console.log('All input elements:', document.querySelectorAll('input'));
+    console.log('CSRF token element:', document.querySelector('[name=csrfmiddlewaretoken]'));
+    
+    // Get CSRF token
+    const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]');
+    if (!csrfToken) {
+        console.error('CSRF token not found!');
+        console.log('Available input elements:', Array.from(document.querySelectorAll('input')).map(el => el.name));
+        alert('CSRF token not found. Please refresh the page and try again.');
+        return;
+    }
+    
+    console.log('CSRF token found:', csrfToken.value);
+    
     fetch(`/downloads/${downloadId}/start/`, {
         method: 'POST',
         headers: {
-            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
+            'X-CSRFToken': csrfToken.value,
             'Content-Type': 'application/json',
         },
     })
-    .then(response => response.json())
+    .then(response => {
+        console.log('Response status:', response.status);
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        return response.json();
+    })
     .then(data => {
+        console.log('Response data:', data);
         if (data.success) {
+            alert('Download started successfully!');
             location.reload();
         } else {
-            alert('Error starting download: ' + data.error);
+            alert('Error starting download: ' + (data.error || 'Unknown error'));
         }
     })
     .catch(error => {
         console.error('Error:', error);
-        alert('An error occurred while starting the download.');
+        alert('An error occurred while starting the download: ' + error.message);
     });
 }
 

@@ -42,10 +42,10 @@ Use the enhanced auto-download client with username parameter:
 
 ```bash
 # With username (sessions will appear in your account)
-python django/auto_download_client.py "https://youtu.be/dQw4w9WgXcQ" --username your_username
+python src/api/auto_download_client.py "https://youtu.be/dQw4w9WgXcQ" --username your_username
 
 # Without username (sessions won't appear in your account)
-python django/auto_download_client.py "https://youtu.be/dQw4w9WgXcQ"
+python src/api/auto_download_client.py "https://youtu.be/dQw4w9WgXcQ"
 ```
 
 ### For Existing Unlinked Sessions
@@ -89,7 +89,7 @@ python django/my_downloader/manage.py link_sessions_to_user --username your_user
 ## Files Modified
 
 1. `django/audio_dl/views.py` - Enhanced auto-download view and added linking views
-2. `django/auto_download_client.py` - Added username parameter support
+2. `src/api/auto_download_client.py` - Added username parameter support (moved from django/)
 3. `django/audio_dl/urls.py` - Added new URL patterns
 4. `django/audio_dl/management/commands/link_sessions_to_user.py` - New management command
 
@@ -99,7 +99,7 @@ To test the solution:
 
 1. **Test downloads with username**:
    ```bash
-   python django/auto_download_client.py "https://youtu.be/dQw4w9WgXcQ" --username your_username
+   python src/api/auto_download_client.py "https://youtu.be/dQw4w9WgXcQ" --username your_username
    ```
 
 2. **Check sessions appear in Django interface**:

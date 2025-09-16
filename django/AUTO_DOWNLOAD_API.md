@@ -205,7 +205,7 @@ Currently no rate limiting is implemented. For production use, consider implemen
 A Python client library is provided for easy integration:
 
 ```python
-from auto_download_client import AutoDownloadClient
+from src.api.auto_download_client import AutoDownloadClient
 
 # Basic usage (unlinked session)
 client = AutoDownloadClient()
@@ -216,7 +216,7 @@ client = AutoDownloadClient(username="your_username")
 result = client.download("https://youtube.com/watch?v=XNNjYas8Xo8")
 
 # Command line usage
-# python auto_download_client.py "https://youtu.be/VIDEO_ID" --username your_username
+# python src/api/auto_download_client.py "https://youtu.be/VIDEO_ID" --username your_username
 ```
 
 ## Database Integration
